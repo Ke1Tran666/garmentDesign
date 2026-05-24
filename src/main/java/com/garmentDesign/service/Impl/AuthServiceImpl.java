@@ -37,4 +37,20 @@ public class AuthServiceImpl implements AuthService {
 
         return result;
     }
+    
+    @Override
+    public Map<String, Object> loginPhone(String phone) {
+
+        UserAuthProvider auth = authProviderRepository
+                .findByPhoneAndProvider(phone, "phone")
+                .orElseThrow(() -> new RuntimeException("Số điện thoại không tồn tại"));
+
+        User user = auth.getUser();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("token", "fake-token-demo");
+        result.put("user", user);
+
+        return result;
+    }
 }

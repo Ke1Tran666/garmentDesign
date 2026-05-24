@@ -24,4 +24,12 @@ public class AuthController {
 
         return ResponseEntity.ok(authService.login(email, password));
     }
+    
+    @PostMapping("/login-phone")
+    public ResponseEntity<?> loginPhone(@RequestBody Map<String, String> body) {
+
+        String phone = body.get("phone");
+
+        return ResponseEntity.ok(authService.loginPhone(phone));
+    }
 }

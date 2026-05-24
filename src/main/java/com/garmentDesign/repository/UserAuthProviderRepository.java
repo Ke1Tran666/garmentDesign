@@ -10,4 +10,6 @@ import com.garmentDesign.entity.UserAuthProvider;
 @Repository
 public interface UserAuthProviderRepository extends JpaRepository<UserAuthProvider, Long> {
 	Optional<UserAuthProvider> findByEmailAndProvider(String email, String provider);
+	
+	Optional<UserAuthProvider> findByPhoneAndProvider(String phone, String provider);
 }
