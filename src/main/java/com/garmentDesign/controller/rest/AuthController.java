@@ -32,4 +32,16 @@ public class AuthController {
 
         return ResponseEntity.ok(authService.loginPhone(phone));
     }
+    
+    @PostMapping("/send-otp")
+    public ResponseEntity<?> sendOtp(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(authService.sendOtp(body.get("phone")));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<?> verifyOtp(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(
+            authService.verifyOtp(body.get("phone"), body.get("otp"))
+        );
+    }
 }
