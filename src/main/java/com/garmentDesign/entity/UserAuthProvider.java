@@ -3,10 +3,14 @@ package com.garmentDesign.entity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.GeneratedValue;
+
 @Entity
 @Table(name = "User_Auth_Providers")
 public class UserAuthProvider {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
