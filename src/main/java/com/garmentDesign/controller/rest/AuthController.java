@@ -44,4 +44,18 @@ public class AuthController {
             authService.verifyOtp(body.get("phone"), body.get("otp"))
         );
     }
+    
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
+
+        return ResponseEntity.ok(
+            authService.register(
+                body.get("email"),
+                body.get("password"),
+                body.get("fullName"),
+                body.get("gender"),
+                body.get("birthday")
+            )
+        );
+    }
 }

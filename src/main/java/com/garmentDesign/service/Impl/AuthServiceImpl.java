@@ -1,5 +1,6 @@
 package com.garmentDesign.service.Impl;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -7,14 +8,13 @@ import java.util.Random;
 
 import org.springframework.stereotype.Service;
 
+import com.garmentDesign.entity.Role;
 import com.garmentDesign.entity.User;
 import com.garmentDesign.entity.UserAuthProvider;
 import com.garmentDesign.repository.RoleRepository;
 import com.garmentDesign.repository.UserAuthProviderRepository;
 import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.AuthService;
-import com.garmentDesign.entity.Role;
-import com.garmentDesign.repository.RoleRepository;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -153,6 +153,110 @@ public class AuthServiceImpl implements AuthService {
         Map<String, Object> result = new HashMap<>();
         result.put("token", "fake-token-demo");
         result.put("user", user);
+
+        return result;
+    }
+    
+    //    REGISTER
+    @Override
+    public Map<String, Object> register(
+            String email,
+            String password,
+            String fullName,
+            String gender,
+            String birthday
+    ) {
+
+        // Kiểm tra email đã tồn tại chưa
+        boolean emailExists = authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .isPresent();
+
+        if (emailExists) {
+            throw new RuntimeException("Email đã tồn tại");
+        }
+
+        String idUser = generateRandom5Number();
+
+        /*
+        HUNN03xxxxx
+        */
+        String prefixName;
+
+        if (fullName.length() >= 3) {
+            prefixName = fullName
+                    .replaceAll("\\s+", "")
+                    .substring(0, 3)
+                    .toUpperCase();
+        } else {
+            prefixName = ("O" + fullName)
+                    .substring(0, 3)
+                    .toUpperCase();
+        }
+
+        String genderCode;
+
+        switch (gender.toLowerCase()) {
+            case "male":
+                genderCode = "N";
+                break;
+
+            case "female":
+                genderCode = "F";
+                break;
+
+            default:
+                genderCode = "U";
+                break;
+        }
+
+        String yearCode = "00";
+
+        if (birthday != null && !birthday.isEmpty()) {
+            yearCode = birthday.substring(2, 4);
+        }
+
+        String userCode = prefixName + genderCode + yearCode + idUser;
+
+        // ROLE USER
+        Role userRole = roleRepository.findById(3L)
+                .orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
+
+        // USERS
+        User user = new User();
+
+        user.setIdUser(idUser);
+        user.setUserCode(userCode);
+
+        user.setFullName(fullName);
+        user.setGender(gender);
+
+        user.setBirthday(LocalDate.parse(birthday));
+
+        user.setStatus("active");
+
+        user.setRole(userRole);
+
+        user = userRepository.save(user);
+
+        // AUTH PROVIDER
+        UserAuthProvider auth = new UserAuthProvider();
+
+        auth.setUser(user);
+
+        auth.setProvider("local");
+
+        auth.setEmail(email);
+        
+        auth.setEmailVerifiedAt(null);
+
+        auth.setPassword(password);
+
+        authProviderRepository.save(auth);
+
+        Map<String, Object> result = new HashMap<>();
+
+        result.put("message", "Đăng ký thành công");
 
         return result;
     }
