@@ -15,26 +15,66 @@ import com.garmentDesign.repository.RoleRepository;
 import com.garmentDesign.repository.UserAuthProviderRepository;
 import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.AuthService;
+import com.garmentDesign.service.OtpService;
+
+import java.text.Normalizer;
 
 @Service
 public class AuthServiceImpl implements AuthService {
 
     private final UserAuthProviderRepository authProviderRepository;
     
-    private final Map<String, String> otpStorage = new HashMap<>();
-    
     private final UserRepository userRepository;
     
     private final RoleRepository roleRepository;
+    
+    private final OtpService otpService;
 
     public AuthServiceImpl(
             UserAuthProviderRepository authProviderRepository,
             UserRepository userRepository,
-            RoleRepository roleRepository
+            RoleRepository roleRepository,
+            OtpService otpService
     ) {
         this.authProviderRepository = authProviderRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.otpService = otpService;
+    }
+    
+    //    Hàm bỏ dấu tiếng Việt
+    private String removeVietnameseAccent(String value) {
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD);
+
+        return normalized
+                .replaceAll("\\p{M}", "")
+                .replace("Đ", "D")
+                .replace("đ", "d");
+    }
+    
+    // Hàm tạo mã tên
+    private String generateNameCode(String fullName) {
+
+        if (fullName == null || fullName.trim().isEmpty()) {
+            return "USE";
+        }
+
+        String cleanName = removeVietnameseAccent(fullName)
+                .trim()
+                .replaceAll("\\s+", " ");
+
+        String[] words = cleanName.split(" ");
+
+        String lastName = words[words.length - 1]
+                .replaceAll("[^a-zA-Z]", "")
+                .toUpperCase();
+
+        if (lastName.length() >= 3) {
+            return lastName.substring(0, 3);
+        }
+
+        return String.format("%-3s", lastName)
+                .replace(' ', 'O');
     }
     
     //    Hàm random
@@ -49,11 +89,19 @@ public class AuthServiceImpl implements AuthService {
                 .findByEmailAndProvider(email, "local")
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
 
+        User user = auth.getUser();
+
+        if ("inactive".equalsIgnoreCase(user.getStatus())) {
+            throw new RuntimeException("Tài khoản của bạn đang tạm ngưng hoạt động. Vui lòng liên hệ hotline để được hỗ trợ.");
+        }
+
+        if ("banned".equalsIgnoreCase(user.getStatus())) {
+            throw new RuntimeException("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hotline để được hỗ trợ.");
+        }
+
         if (!auth.getPassword().equals(password)) {
             throw new RuntimeException("Mật khẩu không đúng");
         }
-
-        User user = auth.getUser();
 
         Map<String, Object> result = new HashMap<>();
         result.put("token", "fake-token-demo");
@@ -83,11 +131,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Map<String, Object> sendOtp(String phone) {
 
-        String otp = String.format("%06d", new Random().nextInt(1000000));
-
-        otpStorage.put(phone, otp);
-
-        System.out.println("OTP của " + phone + ": " + otp);
+        otpService.sendOtp(phone, "phone");
 
         Map<String, Object> result = new HashMap<>();
         result.put("message", "Đã gửi OTP");
@@ -98,11 +142,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Map<String, Object> verifyOtp(String phone, String otp) {
 
-        String savedOtp = otpStorage.get(phone);
-
-        if (savedOtp == null || !savedOtp.equals(otp)) {
-            throw new RuntimeException("OTP không chính xác");
-        }
+    	otpService.verifyOtp(phone, "phone", otp);
 
         UserAuthProvider auth = authProviderRepository
                 .findByPhoneAndProvider(phone, "phone")
@@ -148,7 +188,7 @@ public class AuthServiceImpl implements AuthService {
             authProviderRepository.save(newAuth);
         }
 
-        otpStorage.remove(phone);
+        otpService.clearOtp(phone, "phone");
 
         Map<String, Object> result = new HashMap<>();
         result.put("token", "fake-token-demo");
@@ -181,24 +221,13 @@ public class AuthServiceImpl implements AuthService {
         /*
         HUNN03xxxxx
         */
-        String prefixName;
-
-        if (fullName.length() >= 3) {
-            prefixName = fullName
-                    .replaceAll("\\s+", "")
-                    .substring(0, 3)
-                    .toUpperCase();
-        } else {
-            prefixName = ("O" + fullName)
-                    .substring(0, 3)
-                    .toUpperCase();
-        }
+        String prefixName = generateNameCode(fullName);
 
         String genderCode;
 
         switch (gender.toLowerCase()) {
             case "male":
-                genderCode = "N";
+                genderCode = "M";
                 break;
 
             case "female":
@@ -233,7 +262,7 @@ public class AuthServiceImpl implements AuthService {
 
         user.setBirthday(LocalDate.parse(birthday));
 
-        user.setStatus("active");
+        user.setStatus("pending");
 
         user.setRole(userRole);
 
@@ -257,6 +286,86 @@ public class AuthServiceImpl implements AuthService {
         Map<String, Object> result = new HashMap<>();
 
         result.put("message", "Đăng ký thành công");
+
+        return result;
+    }
+    
+    @Override
+    public Map<String, Object> forgotPassword(String email) {
+
+        UserAuthProvider auth = authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+
+        User user = auth.getUser();
+
+        switch (user.getStatus().toLowerCase()) {
+
+            case "active":
+                break;
+
+            case "pending":
+                throw new RuntimeException(
+                    "Tài khoản của bạn chưa hoàn tất đăng ký. Vui lòng liên hệ hotline để được hỗ trợ."
+                );
+
+            case "inactive":
+                throw new RuntimeException(
+                    "Tài khoản của bạn hiện đang tạm ngưng hoạt động. Vui lòng liên hệ hotline để được hỗ trợ."
+                );
+
+            case "banned":
+                throw new RuntimeException(
+                    "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hotline để được hỗ trợ."
+                );
+
+            default:
+                throw new RuntimeException(
+                    "Trạng thái tài khoản không hợp lệ."
+                );
+        }
+
+        otpService.sendOtp(email, "email");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("message", "Đã gửi OTP về email");
+
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> verifyForgotOtp(String email, String otp) {
+        authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+
+        otpService.verifyOtp(email, "email", otp);
+        otpService.markVerified(email, "email");
+        otpService.clearOtp(email, "email");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("message", "Xác thực OTP thành công");
+
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> resetPassword(String email, String newPassword) {
+        if (!otpService.isVerified(email, "email")) {
+            throw new RuntimeException("Bạn chưa xác thực OTP hoặc phiên đã hết hạn");
+        }
+
+        UserAuthProvider auth = authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+
+        auth.setPassword(newPassword);
+        authProviderRepository.save(auth);
+
+        otpService.clearVerified(email, "email");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("message", "Đổi mật khẩu thành công");
 
         return result;
     }

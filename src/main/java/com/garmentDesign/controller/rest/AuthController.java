@@ -58,4 +58,25 @@ public class AuthController {
             )
         );
     }
+    
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(
+            authService.forgotPassword(body.get("email"))
+        );
+    }
+
+    @PostMapping("/verify-forgot-otp")
+    public ResponseEntity<?> verifyForgotOtp(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(
+            authService.verifyForgotOtp(body.get("email"), body.get("otp"))
+        );
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(
+            authService.resetPassword(body.get("email"), body.get("newPassword"))
+        );
+    }
 }
