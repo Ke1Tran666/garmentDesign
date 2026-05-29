@@ -79,4 +79,12 @@ public class AuthController {
             authService.resetPassword(body.get("email"), body.get("newPassword"))
         );
     }
+    
+    //    LOGIN GOOGLE
+    @PostMapping("/google-login")
+    public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(
+            authService.googleLogin(body.get("accessToken"))
+        );
+    }
 }

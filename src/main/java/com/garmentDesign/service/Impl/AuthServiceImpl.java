@@ -19,6 +19,9 @@ import com.garmentDesign.service.OtpService;
 
 import java.text.Normalizer;
 
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
+
 @Service
 public class AuthServiceImpl implements AuthService {
 
@@ -366,6 +369,96 @@ public class AuthServiceImpl implements AuthService {
 
         Map<String, Object> result = new HashMap<>();
         result.put("message", "Đổi mật khẩu thành công");
+
+        return result;
+    }
+    
+    @Override
+    public Map<String, Object> googleLogin(String accessToken) {
+
+        if (accessToken == null || accessToken.trim().isEmpty()) {
+            throw new RuntimeException("Google access token không hợp lệ");
+        }
+
+        RestTemplate restTemplate = new RestTemplate();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                HttpMethod.GET,
+                entity,
+                Map.class
+        );
+
+        Map<String, Object> googleUser = response.getBody();
+
+        if (googleUser == null || googleUser.get("email") == null) {
+            throw new RuntimeException("Không lấy được thông tin Google");
+        }
+
+        String googleId = googleUser.get("sub").toString();
+        String email = googleUser.get("email").toString();
+        String fullName = googleUser.get("name") != null
+                ? googleUser.get("name").toString()
+                : "Google User";
+
+        UserAuthProvider auth = authProviderRepository
+                .findByEmailAndProvider(email, "google")
+                .orElse(null);
+
+        User user;
+
+        if (auth != null) {
+            user = auth.getUser();
+
+            if ("inactive".equalsIgnoreCase(user.getStatus())) {
+                throw new RuntimeException("Tài khoản của bạn đang tạm ngưng hoạt động. Vui lòng liên hệ hotline để được hỗ trợ.");
+            }
+
+            if ("banned".equalsIgnoreCase(user.getStatus())) {
+                throw new RuntimeException("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hotline để được hỗ trợ.");
+            }
+
+        } else {
+            String idUser = generateRandom5Number();
+
+            String prefixName = generateNameCode(fullName);
+            String genderCode = "U";
+            String yearCode = "00";
+            String userCode = prefixName + genderCode + yearCode + idUser;
+
+            Role userRole = roleRepository.findById(3L)
+                    .orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
+
+            user = new User();
+
+            user.setIdUser(idUser);
+            user.setUserCode(userCode);
+            user.setFullName(fullName);
+            user.setGender("Unknown");
+            user.setStatus("active");
+            user.setRole(userRole);
+
+            user = userRepository.save(user);
+
+            UserAuthProvider newAuth = new UserAuthProvider();
+
+            newAuth.setUser(user);
+            newAuth.setProvider("google");
+            newAuth.setProviderId(googleId);
+            newAuth.setEmail(email);
+            newAuth.setEmailVerifiedAt(LocalDateTime.now());
+
+            authProviderRepository.save(newAuth);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("token", "fake-token-demo");
+        result.put("user", user);
 
         return result;
     }
