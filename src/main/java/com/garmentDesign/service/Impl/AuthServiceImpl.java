@@ -82,7 +82,12 @@ public class AuthServiceImpl implements AuthService {
     
     //    Hàm random
     private String generateRandom5Number() {
-        return String.format("%05d", new Random().nextInt(100000));
+    	String id;
+        do {
+            id = String.format("%05d", new Random().nextInt(100000));
+        } while (userRepository.existsById(id));
+
+        return id;
     }
     
     //    EMAIL
