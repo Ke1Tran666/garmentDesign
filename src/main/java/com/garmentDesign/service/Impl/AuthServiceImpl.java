@@ -25,7 +25,8 @@ import org.springframework.web.client.RestTemplate;
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    private final UserAuthProviderRepository authProviderRepository;
+
+	private final UserAuthProviderRepository authProviderRepository;
     
     private final UserRepository userRepository;
     
@@ -112,8 +113,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Map<String, Object> result = new HashMap<>();
+        
+        // login
         result.put("token", "fake-token-demo");
-        result.put("user", user);
+        result.put("idUser", user.getIdUser());
 
         return result;
     }
@@ -129,8 +132,10 @@ public class AuthServiceImpl implements AuthService {
         User user = auth.getUser();
 
         Map<String, Object> result = new HashMap<>();
+        
+        // loginPhone
         result.put("token", "fake-token-demo");
-        result.put("user", user);
+        result.put("idUser", user.getIdUser());
 
         return result;
     }
@@ -199,8 +204,10 @@ public class AuthServiceImpl implements AuthService {
         otpService.clearOtp(phone, "phone");
 
         Map<String, Object> result = new HashMap<>();
+        
+        // verifyOtp
         result.put("token", "fake-token-demo");
-        result.put("user", user);
+        result.put("idUser", user.getIdUser());
 
         return result;
     }
@@ -462,8 +469,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Map<String, Object> result = new HashMap<>();
+        
+        // googleLogin
         result.put("token", "fake-token-demo");
-        result.put("user", user);
+        result.put("idUser", user.getIdUser());
 
         return result;
     }

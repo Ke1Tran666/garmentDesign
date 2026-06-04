@@ -21,6 +21,11 @@ public class UserController {
         return service.findAll();
     }
 
+    @GetMapping("/me/{idUser}")
+    public ResponseEntity<?> getMyProfile(@PathVariable String idUser) {
+        return ResponseEntity.ok(service.getProfile(idUser));
+    }
+
     @GetMapping("/{id}")
     public User getById(@PathVariable String id) {
         return service.findById(id);
