@@ -10,6 +10,10 @@ public interface AuthService {
     Map<String, Object> sendOtp(String phone);
 
     Map<String, Object> verifyOtp(String phone, String otp);
+    
+    Map<String, Object> sendEmailOtp(String email);
+
+    Map<String, Object> verifyEmailOtp(String email, String otp);
 
     Map<String, Object> forgotPassword(String email);
 

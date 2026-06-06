@@ -1,12 +1,19 @@
 package com.garmentDesign.service.Impl;
 
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import com.garmentDesign.entity.Role;
 import com.garmentDesign.entity.User;
@@ -16,11 +23,6 @@ import com.garmentDesign.repository.UserAuthProviderRepository;
 import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.AuthService;
 import com.garmentDesign.service.OtpService;
-
-import java.text.Normalizer;
-
-import org.springframework.http.*;
-import org.springframework.web.client.RestTemplate;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -33,6 +35,8 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     
     private final OtpService otpService;
+
+    private final Map<String, String> otpStorage = new ConcurrentHashMap<>();
 
     public AuthServiceImpl(
             UserAuthProviderRepository authProviderRepository,
@@ -140,7 +144,7 @@ public class AuthServiceImpl implements AuthService {
         return result;
     }
     
-    //    OTP
+    //    OTP Số ĐT
     @Override
     public Map<String, Object> sendOtp(String phone) {
 
@@ -210,6 +214,48 @@ public class AuthServiceImpl implements AuthService {
         result.put("idUser", user.getIdUser());
 
         return result;
+    }
+    
+    //    OTP Email Local
+    @Override
+    public Map<String, Object> sendEmailOtp(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new RuntimeException("Email không được để trống");
+        }
+
+        authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản local với email này"));
+
+        otpService.sendOtp(email, "email");
+
+        return Map.of(
+                "message", "Đã gửi OTP xác thực email"
+        );
+    }
+    
+    @Override
+    public Map<String, Object> verifyEmailOtp(String email, String otp) {
+        boolean valid = otpService.verifyOtp(email, "email", otp);
+
+        if (!valid) {
+            throw new RuntimeException("OTP không đúng hoặc đã hết hạn");
+        }
+
+        UserAuthProvider provider = authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản local với email này"));
+
+        provider.setEmailVerifiedAt(LocalDateTime.now());
+        provider.setUpdatedAt(LocalDateTime.now());
+
+        authProviderRepository.save(provider);
+
+        otpService.clearOtp(email, "email");
+
+        return Map.of(
+                "message", "Xác thực email thành công"
+        );
     }
     
     //    REGISTER
