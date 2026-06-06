@@ -95,6 +95,32 @@ public class AuthServiceImpl implements AuthService {
         return id;
     }
     
+    private User createPendingPhoneUser() {
+        String idUser = generateRandom5Number();
+        String userCode = "USEU00" + idUser;
+
+        Role userRole = roleRepository.findById(3L)
+                .orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
+
+        User user = new User();
+        user.setIdUser(idUser);
+        user.setUserCode(userCode);
+        user.setGender("Unknown");
+        user.setStatus("pending");
+        user.setRole(userRole);
+
+        return userRepository.save(user);
+    }
+    
+    private User getUserForLinking(String idUser) {
+        if (idUser == null || idUser.trim().isEmpty()) {
+            return createPendingPhoneUser();
+        }
+
+        return userRepository.findById(idUser)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng để liên kết"));
+    }
+    
     //    EMAIL
     @Override
     public Map<String, Object> login(String email, String password) {
@@ -157,9 +183,17 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Map<String, Object> verifyOtp(String phone, String otp) {
+    public Map<String, Object> verifyOtp(String idUser, String phone, String otp, String mode) {
 
-    	otpService.verifyOtp(phone, "phone", otp);
+        if (phone == null || phone.trim().isEmpty()) {
+            throw new RuntimeException("Số điện thoại không được để trống");
+        }
+
+        otpService.verifyOtp(phone, "phone", otp);
+
+        String normalizedMode = mode == null || mode.trim().isEmpty()
+                ? "existing"
+                : mode.trim();
 
         UserAuthProvider auth = authProviderRepository
                 .findByPhoneAndProvider(phone, "phone")
@@ -169,38 +203,26 @@ public class AuthServiceImpl implements AuthService {
 
         if (auth != null) {
             user = auth.getUser();
+
+            if ("new".equalsIgnoreCase(normalizedMode)
+                    && idUser != null
+                    && !idUser.trim().isEmpty()
+                    && !user.getIdUser().equals(idUser)) {
+                throw new RuntimeException("Số điện thoại này đã được liên kết với tài khoản khác");
+            }
+
+            auth.setPhoneVerifiedAt(LocalDateTime.now());
+            auth.setUpdatedAt(LocalDateTime.now());
+            authProviderRepository.save(auth);
         } else {
-            user = new User();
-
-            String idUser = generateRandom5Number();
-
-            /*
-            USE = user chưa có tên
-            N   = Unknown
-            00  = chưa có năm sinh
-            + idUser
-            */
-            String userCode = "USEU00" + idUser;
-
-            user.setIdUser(idUser);
-            user.setUserCode(userCode);
-            
-            user.setGender("Unknown");
-
-            user.setStatus("pending");
-            
-            Role userRole = roleRepository.findById(3L)
-                    .orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
-
-            user.setRole(userRole);
-            
-            user = userRepository.save(user);
+            user = getUserForLinking(idUser);
 
             UserAuthProvider newAuth = new UserAuthProvider();
             newAuth.setUser(user);
             newAuth.setProvider("phone");
             newAuth.setPhone(phone);
             newAuth.setPhoneVerifiedAt(LocalDateTime.now());
+            newAuth.setUpdatedAt(LocalDateTime.now());
 
             authProviderRepository.save(newAuth);
         }
@@ -208,8 +230,7 @@ public class AuthServiceImpl implements AuthService {
         otpService.clearOtp(phone, "phone");
 
         Map<String, Object> result = new HashMap<>();
-        
-        // verifyOtp
+        result.put("message", "Xác thực số điện thoại thành công");
         result.put("token", "fake-token-demo");
         result.put("idUser", user.getIdUser());
 
@@ -235,26 +256,58 @@ public class AuthServiceImpl implements AuthService {
     }
     
     @Override
-    public Map<String, Object> verifyEmailOtp(String email, String otp) {
+    public Map<String, Object> verifyEmailOtp(String idUser, String email, String otp, String mode) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new RuntimeException("Email không được để trống");
+        }
+
         boolean valid = otpService.verifyOtp(email, "email", otp);
 
         if (!valid) {
             throw new RuntimeException("OTP không đúng hoặc đã hết hạn");
         }
 
+        String normalizedMode = mode == null || mode.trim().isEmpty()
+                ? "existing"
+                : mode.trim();
+
         UserAuthProvider provider = authProviderRepository
                 .findByEmailAndProvider(email, "local")
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản local với email này"));
+                .orElse(null);
 
-        provider.setEmailVerifiedAt(LocalDateTime.now());
-        provider.setUpdatedAt(LocalDateTime.now());
+        User user;
 
-        authProviderRepository.save(provider);
+        if (provider != null) {
+            user = provider.getUser();
+
+            if ("new".equalsIgnoreCase(normalizedMode)
+                    && idUser != null
+                    && !idUser.trim().isEmpty()
+                    && !user.getIdUser().equals(idUser)) {
+                throw new RuntimeException("Email này đã được liên kết với tài khoản khác");
+            }
+
+            provider.setEmailVerifiedAt(LocalDateTime.now());
+            provider.setUpdatedAt(LocalDateTime.now());
+            authProviderRepository.save(provider);
+        } else {
+            user = getUserForLinking(idUser);
+
+            UserAuthProvider newProvider = new UserAuthProvider();
+            newProvider.setUser(user);
+            newProvider.setProvider("local");
+            newProvider.setEmail(email);
+            newProvider.setEmailVerifiedAt(LocalDateTime.now());
+            newProvider.setUpdatedAt(LocalDateTime.now());
+
+            authProviderRepository.save(newProvider);
+        }
 
         otpService.clearOtp(email, "email");
 
         return Map.of(
-                "message", "Xác thực email thành công"
+                "message", "Xác thực email thành công",
+                "idUser", user.getIdUser()
         );
     }
     

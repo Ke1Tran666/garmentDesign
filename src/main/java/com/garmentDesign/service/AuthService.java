@@ -9,11 +9,11 @@ public interface AuthService {
 
     Map<String, Object> sendOtp(String phone);
 
-    Map<String, Object> verifyOtp(String phone, String otp);
+    Map<String, Object> verifyOtp(String idUser, String phone, String otp,String mode);
     
     Map<String, Object> sendEmailOtp(String email);
 
-    Map<String, Object> verifyEmailOtp(String email, String otp);
+    Map<String, Object> verifyEmailOtp(String idUser, String email, String otp,String mode);
 
     Map<String, Object> forgotPassword(String email);
 
