@@ -15,6 +15,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> {})
             .authorizeHttpRequests(auth -> auth
+            	.requestMatchers("/uploads/**").permitAll()
                 .anyRequest().permitAll()
             )
             .formLogin(form -> form.disable());
