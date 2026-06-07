@@ -211,8 +211,10 @@ public class AuthServiceImpl implements AuthService {
                 throw new RuntimeException("Số điện thoại này đã được liên kết với tài khoản khác");
             }
 
+            auth.setDeletedAt(null);
             auth.setPhoneVerifiedAt(LocalDateTime.now());
             auth.setUpdatedAt(LocalDateTime.now());
+
             authProviderRepository.save(auth);
         } else {
             user = getUserForLinking(idUser);
@@ -222,7 +224,9 @@ public class AuthServiceImpl implements AuthService {
             newAuth.setProvider("phone");
             newAuth.setPhone(phone);
             newAuth.setPhoneVerifiedAt(LocalDateTime.now());
+            newAuth.setCreatedAt(LocalDateTime.now());
             newAuth.setUpdatedAt(LocalDateTime.now());
+            newAuth.setDeletedAt(null);
 
             authProviderRepository.save(newAuth);
         }
@@ -287,8 +291,10 @@ public class AuthServiceImpl implements AuthService {
                 throw new RuntimeException("Email này đã được liên kết với tài khoản khác");
             }
 
+            provider.setDeletedAt(null);
             provider.setEmailVerifiedAt(LocalDateTime.now());
             provider.setUpdatedAt(LocalDateTime.now());
+
             authProviderRepository.save(provider);
         } else {
             user = getUserForLinking(idUser);
@@ -298,7 +304,9 @@ public class AuthServiceImpl implements AuthService {
             newProvider.setProvider("local");
             newProvider.setEmail(email);
             newProvider.setEmailVerifiedAt(LocalDateTime.now());
+            newProvider.setCreatedAt(LocalDateTime.now());
             newProvider.setUpdatedAt(LocalDateTime.now());
+            newProvider.setDeletedAt(null);
 
             authProviderRepository.save(newProvider);
         }

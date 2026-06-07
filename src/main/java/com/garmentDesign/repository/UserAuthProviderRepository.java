@@ -16,4 +16,6 @@ public interface UserAuthProviderRepository extends JpaRepository<UserAuthProvid
     Optional<UserAuthProvider> findByPhoneAndProvider(String phone, String provider);
 
     List<UserAuthProvider> findByUser_IdUserAndDeletedAtIsNull(String idUser);
+    
+    long countByUser_IdUserAndDeletedAtIsNull(String idUser);
 }

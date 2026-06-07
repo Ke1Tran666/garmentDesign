@@ -41,6 +41,20 @@ public class UserAuthProviderServiceImpl implements UserAuthProviderService {
 
     @Override
     public void delete(Long id) {
-        repository.deleteById(id);
+        UserAuthProvider provider = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy liên kết với id: " + id));
+
+        String idUser = provider.getUser().getIdUser();
+
+        long totalProviders = repository.countByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        if (totalProviders <= 1) {
+            throw new RuntimeException("Tài khoản phải có ít nhất 1 phương thức đăng nhập.");
+        }
+
+        provider.setDeletedAt(java.time.LocalDateTime.now());
+        provider.setUpdatedAt(java.time.LocalDateTime.now());
+
+        repository.save(provider);
     }
 }
