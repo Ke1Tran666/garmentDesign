@@ -43,6 +43,13 @@ public class UserAuthProviderServiceImpl implements UserAuthProviderService {
     public void delete(Long id) {
         UserAuthProvider provider = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy liên kết với id: " + id));
+        
+        // Không cho gỡ Google
+        if ("google".equalsIgnoreCase(provider.getProvider())) {
+            throw new RuntimeException(
+                    "Không thể gỡ liên kết tài khoản Google."
+            );
+        }
 
         String idUser = provider.getUser().getIdUser();
 

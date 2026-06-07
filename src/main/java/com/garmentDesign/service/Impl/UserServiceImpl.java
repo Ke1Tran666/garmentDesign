@@ -165,6 +165,31 @@ public class UserServiceImpl implements UserService {
     public User save(User data) {
         return repository.save(data);
     }
+    
+    private void updateUserStatus(User user) {
+
+        boolean hasProfileInfo =
+                user.getFullName() != null
+                && !user.getFullName().trim().isEmpty()
+                && user.getBirthday() != null
+                && user.getGender() != null
+                && !"Unknown".equalsIgnoreCase(user.getGender());
+
+        boolean hasVerifiedContact =
+                authProviderRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
+                        .stream()
+                        .anyMatch(provider ->
+                                provider.getEmailVerifiedAt() != null
+                                || provider.getPhoneVerifiedAt() != null
+                        );
+
+        if (hasProfileInfo && hasVerifiedContact) {
+            user.setStatus("active");
+        } else {
+            user.setStatus("pending");
+        }
+    }
 
     @Override
     public User updateProfile(
@@ -186,6 +211,26 @@ public class UserServiceImpl implements UserService {
         );
 
         user.setUserCode(newUserCode);
+        
+        boolean hasVerifiedContact =
+                authProviderRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
+                        .stream()
+                        .anyMatch(provider ->
+                                provider.getEmailVerifiedAt() != null
+                                || provider.getPhoneVerifiedAt() != null
+                        );
+
+        if (hasVerifiedContact
+                && user.getFullName() != null
+                && !user.getFullName().trim().isEmpty()
+                && user.getBirthday() != null
+                && !"Unknown".equalsIgnoreCase(user.getGender())) {
+
+            user.setStatus("active");
+        }
+
+        updateUserStatus(user);
 
         user.setUpdatedAt(LocalDateTime.now());
 
@@ -197,6 +242,32 @@ public class UserServiceImpl implements UserService {
         repository.deleteById(id);
     }
     
+    //    Delete Avatar
+    @Override
+    public Map<String, Object> deleteAvatar(String idUser) {
+
+        User user = repository.findById(idUser)
+                .orElseThrow(() ->
+                        new RuntimeException("Không tìm thấy người dùng"));
+
+        user.setAvatar(null);
+
+        updateUserStatus(user);
+
+        user.setUpdatedAt(LocalDateTime.now());
+
+        repository.save(user);
+
+        Map<String, Object> result = new HashMap<>();
+
+        result.put("message", "Xóa avatar thành công");
+        result.put("avatar", null);
+        result.put("user", user);
+
+        return result;
+    }
+    
+    //    Upload Avatar
     @Override
     public Map<String, Object> uploadAvatar(String idUser, MultipartFile file) {
 
@@ -245,6 +316,8 @@ public class UserServiceImpl implements UserService {
                     "http://localhost:8080/uploads/avatars/" + fileName;
 
             user.setAvatar(avatarUrl);
+            
+            updateUserStatus(user);
 
             repository.save(user);
 

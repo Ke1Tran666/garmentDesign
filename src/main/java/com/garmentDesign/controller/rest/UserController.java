@@ -63,4 +63,11 @@ public class UserController {
     ) {
         return ResponseEntity.ok(service.uploadAvatar(idUser, file));
     }
+    
+    @DeleteMapping("/me/{idUser}/avatar")
+    public ResponseEntity<?> deleteAvatar(
+            @PathVariable String idUser
+    ) {
+        return ResponseEntity.ok(service.deleteAvatar(idUser));
+    }
 }

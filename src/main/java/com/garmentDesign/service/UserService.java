@@ -14,4 +14,5 @@ public interface UserService {
     void delete(String id);
     Map<String, Object> getProfile(String idUser);
     Map<String, Object> uploadAvatar(String idUser, MultipartFile file);
+    Map<String, Object> deleteAvatar(String idUser);
 }

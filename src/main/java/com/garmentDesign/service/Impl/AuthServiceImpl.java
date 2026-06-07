@@ -121,6 +121,35 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng để liên kết"));
     }
     
+    private void updateUserStatus(User user) {
+
+        boolean hasProfileInfo =
+                user.getFullName() != null
+                && !user.getFullName().trim().isEmpty()
+                && user.getBirthday() != null
+                && user.getGender() != null
+                && !"Unknown".equalsIgnoreCase(user.getGender());
+
+        boolean hasVerifiedContact =
+                authProviderRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
+                        .stream()
+                        .anyMatch(provider ->
+                                provider.getEmailVerifiedAt() != null
+                                || provider.getPhoneVerifiedAt() != null
+                        );
+
+        if (hasProfileInfo && hasVerifiedContact) {
+            user.setStatus("active");
+        } else {
+            user.setStatus("pending");
+        }
+
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepository.save(user);
+    }
+    
     //    EMAIL
     @Override
     public Map<String, Object> login(String email, String password) {
@@ -216,6 +245,8 @@ public class AuthServiceImpl implements AuthService {
             auth.setUpdatedAt(LocalDateTime.now());
 
             authProviderRepository.save(auth);
+            
+            updateUserStatus(user);
         } else {
             user = getUserForLinking(idUser);
 
@@ -229,6 +260,8 @@ public class AuthServiceImpl implements AuthService {
             newAuth.setDeletedAt(null);
 
             authProviderRepository.save(newAuth);
+            
+            updateUserStatus(user);
         }
 
         otpService.clearOtp(phone, "phone");
@@ -296,6 +329,8 @@ public class AuthServiceImpl implements AuthService {
             provider.setUpdatedAt(LocalDateTime.now());
 
             authProviderRepository.save(provider);
+            
+            updateUserStatus(user);
         } else {
             user = getUserForLinking(idUser);
 
@@ -309,6 +344,8 @@ public class AuthServiceImpl implements AuthService {
             newProvider.setDeletedAt(null);
 
             authProviderRepository.save(newProvider);
+            
+            updateUserStatus(user);
         }
 
         otpService.clearOtp(email, "email");
