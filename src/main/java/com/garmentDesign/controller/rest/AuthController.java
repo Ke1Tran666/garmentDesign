@@ -33,6 +33,7 @@ public class AuthController {
         return ResponseEntity.ok(authService.loginPhone(phone));
     }
     
+    //    Xác Thực Số ĐT
     @PostMapping("/send-otp")
     public ResponseEntity<?> sendOtp(@RequestBody Map<String, String> body) {
         return ResponseEntity.ok(authService.sendOtp(body.get("phone")));
@@ -41,7 +42,32 @@ public class AuthController {
     @PostMapping("/verify-otp")
     public ResponseEntity<?> verifyOtp(@RequestBody Map<String, String> body) {
         return ResponseEntity.ok(
-            authService.verifyOtp(body.get("phone"), body.get("otp"))
+            authService.verifyOtp(
+                body.get("idUser"),
+                body.get("phone"),
+                body.get("otp"),
+                body.get("mode")
+            )
+        );
+    }
+    
+    //  Xác Thực Email Local
+    @PostMapping("/send-email-otp")
+    public ResponseEntity<?> sendEmailOtp(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(
+            authService.sendEmailOtp(body.get("email"))
+        );
+    }
+
+    @PostMapping("/verify-email-otp")
+    public ResponseEntity<?> verifyEmailOtp(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(
+            authService.verifyEmailOtp(
+                body.get("idUser"),
+                body.get("email"),
+                body.get("otp"),
+                body.get("mode")
+            )
         );
     }
     

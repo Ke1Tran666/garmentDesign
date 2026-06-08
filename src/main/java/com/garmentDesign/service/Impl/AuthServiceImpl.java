@@ -1,12 +1,19 @@
 package com.garmentDesign.service.Impl;
 
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import com.garmentDesign.entity.Role;
 import com.garmentDesign.entity.User;
@@ -17,21 +24,19 @@ import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.AuthService;
 import com.garmentDesign.service.OtpService;
 
-import java.text.Normalizer;
-
-import org.springframework.http.*;
-import org.springframework.web.client.RestTemplate;
-
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    private final UserAuthProviderRepository authProviderRepository;
+
+	private final UserAuthProviderRepository authProviderRepository;
     
     private final UserRepository userRepository;
     
     private final RoleRepository roleRepository;
     
     private final OtpService otpService;
+
+    private final Map<String, String> otpStorage = new ConcurrentHashMap<>();
 
     public AuthServiceImpl(
             UserAuthProviderRepository authProviderRepository,
@@ -90,6 +95,61 @@ public class AuthServiceImpl implements AuthService {
         return id;
     }
     
+    private User createPendingPhoneUser() {
+        String idUser = generateRandom5Number();
+        String userCode = "USEU00" + idUser;
+
+        Role userRole = roleRepository.findById(3L)
+                .orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
+
+        User user = new User();
+        user.setIdUser(idUser);
+        user.setUserCode(userCode);
+        user.setGender("Unknown");
+        user.setStatus("pending");
+        user.setRole(userRole);
+
+        return userRepository.save(user);
+    }
+    
+    private User getUserForLinking(String idUser) {
+        if (idUser == null || idUser.trim().isEmpty()) {
+            return createPendingPhoneUser();
+        }
+
+        return userRepository.findById(idUser)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng để liên kết"));
+    }
+    
+    private void updateUserStatus(User user) {
+
+        boolean hasProfileInfo =
+                user.getFullName() != null
+                && !user.getFullName().trim().isEmpty()
+                && user.getBirthday() != null
+                && user.getGender() != null
+                && !"Unknown".equalsIgnoreCase(user.getGender());
+
+        boolean hasVerifiedContact =
+                authProviderRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
+                        .stream()
+                        .anyMatch(provider ->
+                                provider.getEmailVerifiedAt() != null
+                                || provider.getPhoneVerifiedAt() != null
+                        );
+
+        if (hasProfileInfo && hasVerifiedContact) {
+            user.setStatus("active");
+        } else {
+            user.setStatus("pending");
+        }
+
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepository.save(user);
+    }
+    
     //    EMAIL
     @Override
     public Map<String, Object> login(String email, String password) {
@@ -112,8 +172,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Map<String, Object> result = new HashMap<>();
+        
+        // login
         result.put("token", "fake-token-demo");
-        result.put("user", user);
+        result.put("idUser", user.getIdUser());
 
         return result;
     }
@@ -129,13 +191,15 @@ public class AuthServiceImpl implements AuthService {
         User user = auth.getUser();
 
         Map<String, Object> result = new HashMap<>();
+        
+        // loginPhone
         result.put("token", "fake-token-demo");
-        result.put("user", user);
+        result.put("idUser", user.getIdUser());
 
         return result;
     }
     
-    //    OTP
+    //    OTP Số ĐT
     @Override
     public Map<String, Object> sendOtp(String phone) {
 
@@ -148,9 +212,17 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Map<String, Object> verifyOtp(String phone, String otp) {
+    public Map<String, Object> verifyOtp(String idUser, String phone, String otp, String mode) {
 
-    	otpService.verifyOtp(phone, "phone", otp);
+        if (phone == null || phone.trim().isEmpty()) {
+            throw new RuntimeException("Số điện thoại không được để trống");
+        }
+
+        otpService.verifyOtp(phone, "phone", otp);
+
+        String normalizedMode = mode == null || mode.trim().isEmpty()
+                ? "existing"
+                : mode.trim();
 
         UserAuthProvider auth = authProviderRepository
                 .findByPhoneAndProvider(phone, "phone")
@@ -160,49 +232,128 @@ public class AuthServiceImpl implements AuthService {
 
         if (auth != null) {
             user = auth.getUser();
+
+            if ("new".equalsIgnoreCase(normalizedMode)
+                    && idUser != null
+                    && !idUser.trim().isEmpty()
+                    && !user.getIdUser().equals(idUser)) {
+                throw new RuntimeException("Số điện thoại này đã được liên kết với tài khoản khác");
+            }
+
+            auth.setDeletedAt(null);
+            auth.setPhoneVerifiedAt(LocalDateTime.now());
+            auth.setUpdatedAt(LocalDateTime.now());
+
+            authProviderRepository.save(auth);
+            
+            updateUserStatus(user);
         } else {
-            user = new User();
-
-            String idUser = generateRandom5Number();
-
-            /*
-            USE = user chưa có tên
-            N   = Unknown
-            00  = chưa có năm sinh
-            + idUser
-            */
-            String userCode = "USEU00" + idUser;
-
-            user.setIdUser(idUser);
-            user.setUserCode(userCode);
-            
-            user.setGender("Unknown");
-
-            user.setStatus("pending");
-            
-            Role userRole = roleRepository.findById(3L)
-                    .orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
-
-            user.setRole(userRole);
-            
-            user = userRepository.save(user);
+            user = getUserForLinking(idUser);
 
             UserAuthProvider newAuth = new UserAuthProvider();
             newAuth.setUser(user);
             newAuth.setProvider("phone");
             newAuth.setPhone(phone);
             newAuth.setPhoneVerifiedAt(LocalDateTime.now());
+            newAuth.setCreatedAt(LocalDateTime.now());
+            newAuth.setUpdatedAt(LocalDateTime.now());
+            newAuth.setDeletedAt(null);
 
             authProviderRepository.save(newAuth);
+            
+            updateUserStatus(user);
         }
 
         otpService.clearOtp(phone, "phone");
 
         Map<String, Object> result = new HashMap<>();
+        result.put("message", "Xác thực số điện thoại thành công");
         result.put("token", "fake-token-demo");
-        result.put("user", user);
+        result.put("idUser", user.getIdUser());
 
         return result;
+    }
+    
+    //    OTP Email Local
+    @Override
+    public Map<String, Object> sendEmailOtp(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new RuntimeException("Email không được để trống");
+        }
+
+        authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản local với email này"));
+
+        otpService.sendOtp(email, "email");
+
+        return Map.of(
+                "message", "Đã gửi OTP xác thực email"
+        );
+    }
+    
+    @Override
+    public Map<String, Object> verifyEmailOtp(String idUser, String email, String otp, String mode) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new RuntimeException("Email không được để trống");
+        }
+
+        boolean valid = otpService.verifyOtp(email, "email", otp);
+
+        if (!valid) {
+            throw new RuntimeException("OTP không đúng hoặc đã hết hạn");
+        }
+
+        String normalizedMode = mode == null || mode.trim().isEmpty()
+                ? "existing"
+                : mode.trim();
+
+        UserAuthProvider provider = authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .orElse(null);
+
+        User user;
+
+        if (provider != null) {
+            user = provider.getUser();
+
+            if ("new".equalsIgnoreCase(normalizedMode)
+                    && idUser != null
+                    && !idUser.trim().isEmpty()
+                    && !user.getIdUser().equals(idUser)) {
+                throw new RuntimeException("Email này đã được liên kết với tài khoản khác");
+            }
+
+            provider.setDeletedAt(null);
+            provider.setEmailVerifiedAt(LocalDateTime.now());
+            provider.setUpdatedAt(LocalDateTime.now());
+
+            authProviderRepository.save(provider);
+            
+            updateUserStatus(user);
+        } else {
+            user = getUserForLinking(idUser);
+
+            UserAuthProvider newProvider = new UserAuthProvider();
+            newProvider.setUser(user);
+            newProvider.setProvider("local");
+            newProvider.setEmail(email);
+            newProvider.setEmailVerifiedAt(LocalDateTime.now());
+            newProvider.setCreatedAt(LocalDateTime.now());
+            newProvider.setUpdatedAt(LocalDateTime.now());
+            newProvider.setDeletedAt(null);
+
+            authProviderRepository.save(newProvider);
+            
+            updateUserStatus(user);
+        }
+
+        otpService.clearOtp(email, "email");
+
+        return Map.of(
+                "message", "Xác thực email thành công",
+                "idUser", user.getIdUser()
+        );
     }
     
     //    REGISTER
@@ -462,8 +613,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Map<String, Object> result = new HashMap<>();
+        
+        // googleLogin
         result.put("token", "fake-token-demo");
-        result.put("user", user);
+        result.put("idUser", user.getIdUser());
 
         return result;
     }
