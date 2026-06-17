@@ -20,6 +20,11 @@ public class UserAddressController {
     public List<UserAddress> getAll() {
         return service.findAll();
     }
+    
+    @GetMapping("/user/{idUser}")
+    public List<UserAddress> getByUserId(@PathVariable String idUser) {
+        return service.findByUserId(idUser);
+    }
 
     @GetMapping("/{id}")
     public UserAddress getById(@PathVariable Long id) {
@@ -34,6 +39,14 @@ public class UserAddressController {
     @PutMapping("/{id}")
     public UserAddress update(@PathVariable Long id, @RequestBody UserAddress data) {
         return service.update(id, data);
+    }
+    
+    @PutMapping("/user/{idUser}/default/{addressId}")
+    public UserAddress setDefaultAddress(
+        @PathVariable String idUser,
+        @PathVariable Long addressId
+    ) {
+        return service.setDefaultAddress(idUser, addressId);
     }
 
     @DeleteMapping("/{id}")
