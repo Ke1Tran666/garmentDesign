@@ -35,6 +35,14 @@ public class UserAddressController {
     public UserAddress create(@RequestBody UserAddress data) {
         return service.save(data);
     }
+    
+    @PostMapping("/user/{idUser}")
+    public UserAddress createByUser(
+        @PathVariable String idUser,
+        @RequestBody UserAddress data
+    ) {
+        return service.createByUser(idUser, data);
+    }
 
     @PutMapping("/{id}")
     public UserAddress update(@PathVariable Long id, @RequestBody UserAddress data) {
