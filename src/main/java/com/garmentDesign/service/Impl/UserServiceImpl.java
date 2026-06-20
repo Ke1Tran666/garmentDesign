@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.garmentDesign.dto.user.UpdateProfileRequest;
 import com.garmentDesign.entity.User;
+import com.garmentDesign.entity.UserAddress;
 import com.garmentDesign.entity.UserAuthProvider;
 import com.garmentDesign.repository.UserAddressRepository;
 import com.garmentDesign.repository.UserAuthProviderRepository;
@@ -382,5 +383,35 @@ public class UserServiceImpl implements UserService {
         return Map.of(
                 "message", "Đổi mật khẩu thành công"
         );
+    }
+    
+    @Override
+    public Map<String, Object> exportUserData(String idUser) {
+
+        User user = repository.findById(idUser)
+                .orElseThrow(() ->
+                        new RuntimeException("Không tìm thấy người dùng"));
+
+        List<UserAuthProvider> authProviders =
+                authProviderRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        List<UserAddress> addresses =
+                addressRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        // Không export password
+        authProviders.forEach(provider ->
+                provider.setPassword(null)
+        );
+
+        Map<String, Object> result = new HashMap<>();
+
+        result.put("user", user);
+        result.put("authProviders", authProviders);
+        result.put("addresses", addresses);
+        result.put("defaultAddress", user.getDefaultAddress());
+
+        return result;
     }
 }

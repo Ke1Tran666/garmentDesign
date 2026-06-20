@@ -20,4 +20,5 @@ public interface UserService {
             String oldPassword,
             String newPassword
     );
+    Map<String, Object> exportUserData(String idUser);
 }
