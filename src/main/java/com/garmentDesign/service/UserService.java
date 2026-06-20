@@ -15,4 +15,9 @@ public interface UserService {
     Map<String, Object> getProfile(String idUser);
     Map<String, Object> uploadAvatar(String idUser, MultipartFile file);
     Map<String, Object> deleteAvatar(String idUser);
+    Map<String, Object> changePassword(
+            String idUser,
+            String oldPassword,
+            String newPassword
+    );
 }
