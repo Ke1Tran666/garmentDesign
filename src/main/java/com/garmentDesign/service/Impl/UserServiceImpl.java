@@ -11,12 +11,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.garmentDesign.dto.user.UpdateProfileRequest;
 import com.garmentDesign.entity.User;
+import com.garmentDesign.entity.UserAuthProvider;
 import com.garmentDesign.repository.UserAddressRepository;
 import com.garmentDesign.repository.UserAuthProviderRepository;
 import com.garmentDesign.repository.UserRepository;
@@ -332,5 +332,55 @@ public class UserServiceImpl implements UserService {
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage());
         }
+    }
+    //    Change Password
+    @Override
+    public Map<String, Object> changePassword(
+            String idUser,
+            String oldPassword,
+            String newPassword
+    ) {
+        if (idUser == null || idUser.trim().isEmpty()) {
+            throw new RuntimeException("Không tìm thấy người dùng");
+        }
+
+        if (oldPassword == null || oldPassword.trim().isEmpty()) {
+            throw new RuntimeException("Vui lòng nhập mật khẩu hiện tại");
+        }
+
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new RuntimeException("Mật khẩu mới phải có ít nhất 8 ký tự");
+        }
+
+        if (oldPassword.equals(newPassword)) {
+            throw new RuntimeException("Mật khẩu mới phải khác mật khẩu hiện tại");
+        }
+
+        UserAuthProvider localProvider = authProviderRepository
+                .findByUser_IdUserAndProviderAndDeletedAtIsNull(idUser, "local")
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Tài khoản của bạn chưa liên kết đăng nhập bằng mật khẩu. Vui lòng liên kết tài khoản local trước khi đổi mật khẩu."
+                        )
+                );
+
+        if (localProvider.getPassword() == null || localProvider.getPassword().trim().isEmpty()) {
+            throw new RuntimeException(
+                    "Tài khoản local chưa có mật khẩu."
+            );
+        }
+
+        if (!localProvider.getPassword().equals(oldPassword)) {
+            throw new RuntimeException("Mật khẩu hiện tại không đúng");
+        }
+
+        localProvider.setPassword(newPassword);
+        localProvider.setUpdatedAt(LocalDateTime.now());
+
+        authProviderRepository.save(localProvider);
+
+        return Map.of(
+                "message", "Đổi mật khẩu thành công"
+        );
     }
 }

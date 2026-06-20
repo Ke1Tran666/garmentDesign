@@ -6,6 +6,8 @@ import com.garmentDesign.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -69,5 +71,20 @@ public class UserController {
             @PathVariable String idUser
     ) {
         return ResponseEntity.ok(service.deleteAvatar(idUser));
+    }
+    
+    // Change Password   
+    @PutMapping("/me/{idUser}/change-password")
+    public ResponseEntity<?> changePassword(
+            @PathVariable String idUser,
+            @RequestBody Map<String, String> body
+    ) {
+        return ResponseEntity.ok(
+                service.changePassword(
+                        idUser,
+                        body.get("oldPassword"),
+                        body.get("newPassword")
+                )
+        );
     }
 }
