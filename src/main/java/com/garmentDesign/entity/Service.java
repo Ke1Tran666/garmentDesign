@@ -7,15 +7,31 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "Services")
 public class Service {
-    @Id
-    private Long serviceId;
-    private String serviceName;
-    private String unitType;
-    private BigDecimal basePrice;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "service_id")
+	private Long serviceId;
+	
+	@Column(name = "service_name")
+	private String serviceName;
+
+	@Column(name = "unit_type")
+	private String unitType;
+	
+	@Column(name = "base_price")
+	private BigDecimal basePrice;
+
     private String description;
+    
     private String status;
+    
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
     
     public Service() {}

@@ -6,8 +6,10 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "Service_Order_Files")
 public class ServiceOrderFile {
-    @Id
-    private Long fileId;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "file_id")
+	private Long fileId;
     @ManyToOne @JoinColumn(name = "service_order_id") private ServiceOrder serviceOrder;
     private String fileType;
     private String fileName;

@@ -139,6 +139,44 @@ public class AuthServiceImpl implements AuthService {
             return createPendingPhoneUser();
         }
 
+        return userRepository.findById(idUser)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng để liên kết"));
+    }
+    
+    private void updateUserStatus(User user) {
+
+        boolean hasProfileInfo =
+                user.getFullName() != null
+                && !user.getFullName().trim().isEmpty()
+                && user.getBirthday() != null
+                && user.getGender() != null
+                && !"Unknown".equalsIgnoreCase(user.getGender());
+
+        boolean hasVerifiedContact =
+                authProviderRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
+                        .stream()
+                        .anyMatch(provider ->
+                                provider.getEmailVerifiedAt() != null
+                                || provider.getPhoneVerifiedAt() != null
+                        );
+
+        if (hasProfileInfo && hasVerifiedContact) {
+            user.setStatus("active");
+        } else {
+            user.setStatus("pending");
+        }
+
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepository.save(user);
+    }
+    
+    private User getUserForLinking(String idUser) {
+        if (idUser == null || idUser.trim().isEmpty()) {
+            return createPendingPhoneUser();
+        }
+
         User user = userRepository.findById(idUser)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng để liên kết"));
 
@@ -274,6 +312,18 @@ public class AuthServiceImpl implements AuthService {
             user = auth.getUser();
             
             validateUserStatus(user);
+
+            if ("new".equalsIgnoreCase(normalizedMode)
+                    && idUser != null
+                    && !idUser.trim().isEmpty()
+                    && !user.getIdUser().equals(idUser)) {
+                throw new RuntimeException("Số điện thoại này đã được liên kết với tài khoản khác");
+            }
+
+            auth.setDeletedAt(null);
+            auth.setPhoneVerifiedAt(LocalDateTime.now());
+            auth.setUpdatedAt(LocalDateTime.now());
+
 
             if ("new".equalsIgnoreCase(normalizedMode)
                     && idUser != null

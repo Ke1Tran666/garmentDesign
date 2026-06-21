@@ -1,10 +1,15 @@
 package com.garmentDesign.controller.rest;
 
+import com.garmentDesign.dto.user.UpdateProfileRequest;
 import com.garmentDesign.entity.User;
 import com.garmentDesign.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
+
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/users")
@@ -21,6 +26,11 @@ public class UserController {
         return service.findAll();
     }
 
+    @GetMapping("/me/{idUser}")
+    public ResponseEntity<?> getMyProfile(@PathVariable String idUser) {
+        return ResponseEntity.ok(service.getProfile(idUser));
+    }
+
     @GetMapping("/{id}")
     public User getById(@PathVariable String id) {
         return service.findById(id);
@@ -32,13 +42,49 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public User update(@PathVariable String id, @RequestBody User data) {
-        return service.update(id, data);
+    public User updateProfile(
+            @PathVariable String id,
+            @RequestBody UpdateProfileRequest request
+    ) {
+        return service.updateProfile(id, request);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
+    }
+    
+    @PutMapping(
+            value = "/me/{idUser}/avatar",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<?> uploadAvatar(
+            @PathVariable String idUser,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(service.uploadAvatar(idUser, file));
+    }
+    
+    @DeleteMapping("/me/{idUser}/avatar")
+    public ResponseEntity<?> deleteAvatar(
+            @PathVariable String idUser
+    ) {
+        return ResponseEntity.ok(service.deleteAvatar(idUser));
+    }
+    
+    // Change Password   
+    @PutMapping("/me/{idUser}/change-password")
+    public ResponseEntity<?> changePassword(
+            @PathVariable String idUser,
+            @RequestBody Map<String, String> body
+    ) {
+        return ResponseEntity.ok(
+                service.changePassword(
+                        idUser,
+                        body.get("oldPassword"),
+                        body.get("newPassword")
+                )
+        );
     }
 }

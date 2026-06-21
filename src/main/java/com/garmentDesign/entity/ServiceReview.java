@@ -6,8 +6,10 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "Service_Reviews")
 public class ServiceReview {
-    @Id
-    private Long reviewId;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "review_id")
+	private Long reviewId;
     @ManyToOne @JoinColumn(name = "service_order_id") private ServiceOrder serviceOrder;
     @ManyToOne @JoinColumn(name = "user_id") private User user;
     private String reviewerName;

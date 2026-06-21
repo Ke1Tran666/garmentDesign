@@ -9,8 +9,10 @@ import java.time.LocalDateTime;
 @Table(name = "Service_Orders")
 public class ServiceOrder {
 	
-    @Id
-    private Long serviceOrderId;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "service_order_id")
+	private Long serviceOrderId;
     @ManyToOne @JoinColumn(name = "id_User") private User user;
     @ManyToOne @JoinColumn(name = "service_id") private Service service;
     @ManyToOne @JoinColumn(name = "address_id") private UserAddress address;

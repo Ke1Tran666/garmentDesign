@@ -2,17 +2,20 @@ package com.garmentDesign.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "User_Addresses")
 public class UserAddress {
-    @Id
-    @Column(name = "address_id")
-    private Long addressId;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "address_id")
+	private Long addressId;
 
-    @ManyToOne
-    @JoinColumn(name = "id_User")
-    private User user;
+	@JsonIgnore
+	@ManyToOne
+	@JoinColumn(name = "id_User")
+	private User user;
 
     private String companyName;
     private String address;
