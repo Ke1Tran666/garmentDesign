@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -27,16 +26,10 @@ import com.garmentDesign.service.OtpService;
 @Service
 public class AuthServiceImpl implements AuthService {
 
-
-	private final UserAuthProviderRepository authProviderRepository;
-    
+    private final UserAuthProviderRepository authProviderRepository;
     private final UserRepository userRepository;
-    
     private final RoleRepository roleRepository;
-    
     private final OtpService otpService;
-
-    private final Map<String, String> otpStorage = new ConcurrentHashMap<>();
 
     public AuthServiceImpl(
             UserAuthProviderRepository authProviderRepository,
@@ -49,30 +42,21 @@ public class AuthServiceImpl implements AuthService {
         this.roleRepository = roleRepository;
         this.otpService = otpService;
     }
-    
-    //    Xác thực trạng thái người dùng
-    private void validateUserStatus(User user) {
 
+    private void validateUserStatus(User user) {
         if ("inactive".equalsIgnoreCase(user.getStatus())) {
-            throw new RuntimeException(
-                    "Tài khoản của bạn đang tạm ngưng hoạt động. Vui lòng liên hệ hotline để được hỗ trợ."
-            );
+            throw new RuntimeException("Tài khoản của bạn đang tạm ngưng hoạt động. Vui lòng liên hệ hotline để được hỗ trợ.");
         }
 
         if ("banned".equalsIgnoreCase(user.getStatus())) {
-            throw new RuntimeException(
-                    "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hotline để được hỗ trợ."
-            );
+            throw new RuntimeException("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hotline để được hỗ trợ.");
         }
 
         if ("delete".equalsIgnoreCase(user.getStatus())) {
-            throw new RuntimeException(
-                    "Tài khoản của bạn đã bị xóa. Nếu muốn khôi phục vui lòng liên hệ hotline để được hỗ trợ."
-            );
+            throw new RuntimeException("Tài khoản của bạn đã bị xóa. Nếu muốn khôi phục vui lòng liên hệ hotline để được hỗ trợ.");
         }
     }
-    
-    //    Hàm bỏ dấu tiếng Việt
+
     private String removeVietnameseAccent(String value) {
         String normalized = Normalizer.normalize(value, Normalizer.Form.NFD);
 
@@ -81,10 +65,8 @@ public class AuthServiceImpl implements AuthService {
                 .replace("Đ", "D")
                 .replace("đ", "d");
     }
-    
-    // Hàm tạo mã tên
-    private String generateNameCode(String fullName) {
 
+    private String generateNameCode(String fullName) {
         if (fullName == null || fullName.trim().isEmpty()) {
             return "USE";
         }
@@ -103,20 +85,19 @@ public class AuthServiceImpl implements AuthService {
             return lastName.substring(0, 3);
         }
 
-        return String.format("%-3s", lastName)
-                .replace(' ', 'O');
+        return String.format("%-3s", lastName).replace(' ', 'O');
     }
-    
-    //    Hàm random
+
     private String generateRandom5Number() {
-    	String id;
+        String id;
+
         do {
             id = String.format("%05d", new Random().nextInt(100000));
         } while (userRepository.existsById(id));
 
         return id;
     }
-    
+
     private User createPendingPhoneUser() {
         String idUser = generateRandom5Number();
         String userCode = "USEU00" + idUser;
@@ -133,45 +114,7 @@ public class AuthServiceImpl implements AuthService {
 
         return userRepository.save(user);
     }
-    
-    private User getUserForLinking(String idUser) {
-        if (idUser == null || idUser.trim().isEmpty()) {
-            return createPendingPhoneUser();
-        }
 
-        return userRepository.findById(idUser)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng để liên kết"));
-    }
-    
-    private void updateUserStatus(User user) {
-
-        boolean hasProfileInfo =
-                user.getFullName() != null
-                && !user.getFullName().trim().isEmpty()
-                && user.getBirthday() != null
-                && user.getGender() != null
-                && !"Unknown".equalsIgnoreCase(user.getGender());
-
-        boolean hasVerifiedContact =
-                authProviderRepository
-                        .findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
-                        .stream()
-                        .anyMatch(provider ->
-                                provider.getEmailVerifiedAt() != null
-                                || provider.getPhoneVerifiedAt() != null
-                        );
-
-        if (hasProfileInfo && hasVerifiedContact) {
-            user.setStatus("active");
-        } else {
-            user.setStatus("pending");
-        }
-
-        user.setUpdatedAt(LocalDateTime.now());
-
-        userRepository.save(user);
-    }
-    
     private User getUserForLinking(String idUser) {
         if (idUser == null || idUser.trim().isEmpty()) {
             return createPendingPhoneUser();
@@ -184,9 +127,8 @@ public class AuthServiceImpl implements AuthService {
 
         return user;
     }
-    
+
     private void updateUserStatus(User user) {
-    	
         if ("delete".equalsIgnoreCase(user.getStatus())) {
             return;
         }
@@ -197,10 +139,10 @@ public class AuthServiceImpl implements AuthService {
 
         boolean hasProfileInfo =
                 user.getFullName() != null
-                && !user.getFullName().trim().isEmpty()
-                && user.getBirthday() != null
-                && user.getGender() != null
-                && !"Unknown".equalsIgnoreCase(user.getGender());
+                        && !user.getFullName().trim().isEmpty()
+                        && user.getBirthday() != null
+                        && user.getGender() != null
+                        && !"Unknown".equalsIgnoreCase(user.getGender());
 
         boolean hasVerifiedContact =
                 authProviderRepository
@@ -208,7 +150,7 @@ public class AuthServiceImpl implements AuthService {
                         .stream()
                         .anyMatch(provider ->
                                 provider.getEmailVerifiedAt() != null
-                                || provider.getPhoneVerifiedAt() != null
+                                        || provider.getPhoneVerifiedAt() != null
                         );
 
         if (hasProfileInfo && hasVerifiedContact) {
@@ -218,14 +160,11 @@ public class AuthServiceImpl implements AuthService {
         }
 
         user.setUpdatedAt(LocalDateTime.now());
-
         userRepository.save(user);
     }
-    
-    //    EMAIL LOCAL
+
     @Override
     public Map<String, Object> login(String email, String password) {
-    	
         UserAuthProvider auth = authProviderRepository
                 .findByEmailAndProvider(email, "local")
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
@@ -233,52 +172,43 @@ public class AuthServiceImpl implements AuthService {
         User user = auth.getUser();
 
         validateUserStatus(user);
-        
+
         if (!auth.getPassword().equals(password)) {
             throw new RuntimeException("Mật khẩu không đúng");
         }
 
         Map<String, Object> result = new HashMap<>();
-        
-        // login
         result.put("token", "fake-token-demo");
         result.put("idUser", user.getIdUser());
 
         return result;
     }
-    
-    //    PHONE
+
     @Override
     public Map<String, Object> loginPhone(String phone) {
-
         UserAuthProvider auth = authProviderRepository
                 .findByPhoneAndProvider(phone, "phone")
                 .orElseThrow(() -> new RuntimeException("Số điện thoại không tồn tại"));
 
         User user = auth.getUser();
-        
+
         validateUserStatus(user);
 
         Map<String, Object> result = new HashMap<>();
-        
-        // loginPhone
         result.put("token", "fake-token-demo");
         result.put("idUser", user.getIdUser());
 
         return result;
     }
-    
-    //    OTP Số ĐT
+
     @Override
     public Map<String, Object> sendOtp(String phone) {
-
         UserAuthProvider auth = authProviderRepository
                 .findByPhoneAndProvider(phone, "phone")
                 .orElse(null);
 
         if (auth != null) {
-            User user = auth.getUser();
-            validateUserStatus(user);
+            validateUserStatus(auth.getUser());
         }
 
         otpService.sendOtp(phone, "phone");
@@ -291,7 +221,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public Map<String, Object> verifyOtp(String idUser, String phone, String otp, String mode) {
-
         if (phone == null || phone.trim().isEmpty()) {
             throw new RuntimeException("Số điện thoại không được để trống");
         }
@@ -310,7 +239,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (auth != null) {
             user = auth.getUser();
-            
+
             validateUserStatus(user);
 
             if ("new".equalsIgnoreCase(normalizedMode)
@@ -324,20 +253,7 @@ public class AuthServiceImpl implements AuthService {
             auth.setPhoneVerifiedAt(LocalDateTime.now());
             auth.setUpdatedAt(LocalDateTime.now());
 
-
-            if ("new".equalsIgnoreCase(normalizedMode)
-                    && idUser != null
-                    && !idUser.trim().isEmpty()
-                    && !user.getIdUser().equals(idUser)) {
-                throw new RuntimeException("Số điện thoại này đã được liên kết với tài khoản khác");
-            }
-
-            auth.setDeletedAt(null);
-            auth.setPhoneVerifiedAt(LocalDateTime.now());
-            auth.setUpdatedAt(LocalDateTime.now());
-
             authProviderRepository.save(auth);
-            
             updateUserStatus(user);
         } else {
             user = getUserForLinking(idUser);
@@ -352,7 +268,6 @@ public class AuthServiceImpl implements AuthService {
             newAuth.setDeletedAt(null);
 
             authProviderRepository.save(newAuth);
-            
             updateUserStatus(user);
         }
 
@@ -365,8 +280,7 @@ public class AuthServiceImpl implements AuthService {
 
         return result;
     }
-    
-    //    OTP Email Local
+
     @Override
     public Map<String, Object> sendEmailOtp(String email) {
         if (email == null || email.trim().isEmpty()) {
@@ -379,22 +293,16 @@ public class AuthServiceImpl implements AuthService {
 
         otpService.sendOtp(email, "email");
 
-        return Map.of(
-                "message", "Đã gửi OTP xác thực email"
-        );
+        return Map.of("message", "Đã gửi OTP xác thực email");
     }
-    
+
     @Override
     public Map<String, Object> verifyEmailOtp(String idUser, String email, String otp, String mode) {
         if (email == null || email.trim().isEmpty()) {
             throw new RuntimeException("Email không được để trống");
         }
 
-        boolean valid = otpService.verifyOtp(email, "email", otp);
-
-        if (!valid) {
-            throw new RuntimeException("OTP không đúng hoặc đã hết hạn");
-        }
+        otpService.verifyOtp(email, "email", otp);
 
         String normalizedMode = mode == null || mode.trim().isEmpty()
                 ? "existing"
@@ -408,7 +316,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (provider != null) {
             user = provider.getUser();
-            
+
             validateUserStatus(user);
 
             if ("new".equalsIgnoreCase(normalizedMode)
@@ -423,7 +331,6 @@ public class AuthServiceImpl implements AuthService {
             provider.setUpdatedAt(LocalDateTime.now());
 
             authProviderRepository.save(provider);
-            
             updateUserStatus(user);
         } else {
             user = getUserForLinking(idUser);
@@ -438,7 +345,6 @@ public class AuthServiceImpl implements AuthService {
             newProvider.setDeletedAt(null);
 
             authProviderRepository.save(newProvider);
-            
             updateUserStatus(user);
         }
 
@@ -449,8 +355,7 @@ public class AuthServiceImpl implements AuthService {
                 "idUser", user.getIdUser()
         );
     }
-    
-    //    REGISTER
+
     @Override
     public Map<String, Object> register(
             String email,
@@ -459,29 +364,21 @@ public class AuthServiceImpl implements AuthService {
             String gender,
             String birthday
     ) {
+        UserAuthProvider existingAuth = authProviderRepository
+                .findByEmailAndProvider(email, "local")
+                .orElse(null);
 
-        // Kiểm tra email đã tồn tại chưa
-    	UserAuthProvider existingAuth = authProviderRepository
-    	        .findByEmailAndProvider(email, "local")
-    	        .orElse(null);
+        if (existingAuth != null) {
+            User existingUser = existingAuth.getUser();
 
-    	if (existingAuth != null) {
-    	    User existingUser = existingAuth.getUser();
+            if ("delete".equalsIgnoreCase(existingUser.getStatus())) {
+                throw new RuntimeException("Email này thuộc tài khoản đã bị xóa. Nếu muốn khôi phục vui lòng liên hệ hotline để được hỗ trợ.");
+            }
 
-    	    if ("delete".equalsIgnoreCase(existingUser.getStatus())) {
-    	        throw new RuntimeException(
-    	                "Email này thuộc tài khoản đã bị xóa. Nếu muốn khôi phục vui lòng liên hệ hotline để được hỗ trợ."
-    	        );
-    	    }
-
-    	    throw new RuntimeException("Email đã tồn tại");
-    	}
+            throw new RuntimeException("Email đã tồn tại");
+        }
 
         String idUser = generateRandom5Number();
-
-        /*
-        HUNN03xxxxx
-        */
         String prefixName = generateNameCode(fullName);
 
         String genderCode;
@@ -490,11 +387,9 @@ public class AuthServiceImpl implements AuthService {
             case "male":
                 genderCode = "M";
                 break;
-
             case "female":
                 genderCode = "F";
                 break;
-
             default:
                 genderCode = "U";
                 break;
@@ -508,52 +403,41 @@ public class AuthServiceImpl implements AuthService {
 
         String userCode = prefixName + genderCode + yearCode + idUser;
 
-        // ROLE USER
         Role userRole = roleRepository.findById(3L)
                 .orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
 
-        // USERS
         User user = new User();
-
         user.setIdUser(idUser);
         user.setUserCode(userCode);
-
         user.setFullName(fullName);
         user.setGender(gender);
 
-        user.setBirthday(LocalDate.parse(birthday));
+        if (birthday != null && !birthday.isEmpty()) {
+            user.setBirthday(LocalDate.parse(birthday));
+        }
 
         user.setStatus("pending");
-
         user.setRole(userRole);
 
         user = userRepository.save(user);
 
-        // AUTH PROVIDER
         UserAuthProvider auth = new UserAuthProvider();
-
         auth.setUser(user);
-
         auth.setProvider("local");
-
         auth.setEmail(email);
-        
         auth.setEmailVerifiedAt(null);
-
         auth.setPassword(password);
 
         authProviderRepository.save(auth);
 
         Map<String, Object> result = new HashMap<>();
-
         result.put("message", "Đăng ký thành công");
 
         return result;
     }
-    
+
     @Override
     public Map<String, Object> forgotPassword(String email) {
-
         UserAuthProvider auth = authProviderRepository
                 .findByEmailAndProvider(email, "local")
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
@@ -563,9 +447,7 @@ public class AuthServiceImpl implements AuthService {
         validateUserStatus(user);
 
         if ("pending".equalsIgnoreCase(user.getStatus())) {
-            throw new RuntimeException(
-                    "Tài khoản của bạn chưa hoàn tất đăng ký. Vui lòng liên hệ hotline để được hỗ trợ."
-            );
+            throw new RuntimeException("Tài khoản của bạn chưa hoàn tất đăng ký. Vui lòng liên hệ hotline để được hỗ trợ.");
         }
 
         otpService.sendOtp(email, "email");
@@ -612,10 +494,9 @@ public class AuthServiceImpl implements AuthService {
 
         return result;
     }
-    
+
     @Override
     public Map<String, Object> googleLogin(String accessToken) {
-
         if (accessToken == null || accessToken.trim().isEmpty()) {
             throw new RuntimeException("Google access token không hợp lệ");
         }
@@ -654,22 +535,16 @@ public class AuthServiceImpl implements AuthService {
 
         if (auth != null) {
             user = auth.getUser();
-            
             validateUserStatus(user);
-
         } else {
             String idUser = generateRandom5Number();
-
             String prefixName = generateNameCode(fullName);
-            String genderCode = "U";
-            String yearCode = "00";
-            String userCode = prefixName + genderCode + yearCode + idUser;
+            String userCode = prefixName + "U00" + idUser;
 
             Role userRole = roleRepository.findById(3L)
                     .orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
 
             user = new User();
-
             user.setIdUser(idUser);
             user.setUserCode(userCode);
             user.setFullName(fullName);
@@ -680,7 +555,6 @@ public class AuthServiceImpl implements AuthService {
             user = userRepository.save(user);
 
             UserAuthProvider newAuth = new UserAuthProvider();
-
             newAuth.setUser(user);
             newAuth.setProvider("google");
             newAuth.setProviderId(googleId);
@@ -691,8 +565,6 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Map<String, Object> result = new HashMap<>();
-        
-        // googleLogin
         result.put("token", "fake-token-demo");
         result.put("idUser", user.getIdUser());
 
