@@ -240,7 +240,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void delete(String id) {
-        repository.deleteById(id);
+    	deleteAccount(id);
     }
     
     //    Delete Avatar
@@ -413,5 +413,48 @@ public class UserServiceImpl implements UserService {
         result.put("defaultAddress", user.getDefaultAddress());
 
         return result;
+    }
+    
+    @Override
+    public Map<String, Object> deleteAccount(String idUser) {
+        User user = repository.findById(idUser)
+                .orElseThrow(() ->
+                        new RuntimeException("Không tìm thấy người dùng"));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // Soft delete user
+        user.setDeletedAt(now);
+        user.setUpdatedAt(now);
+        user.setStatus("delete");
+        user.setDefaultAddress(null);
+
+        // Soft delete auth providers
+        List<UserAuthProvider> authProviders =
+                authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        authProviders.forEach(provider -> {
+            provider.setDeletedAt(now);
+            provider.setUpdatedAt(now);
+        });
+
+        // Soft delete addresses
+        List<UserAddress> addresses =
+                addressRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        addresses.forEach(address -> {
+            address.setDeletedAt(now);
+            address.setUpdatedAt(now);
+        });
+
+        authProviderRepository.saveAll(authProviders);
+        addressRepository.saveAll(addresses);
+        repository.save(user);
+
+        return Map.of(
+                "message", "Tài khoản đã được xóa",
+                "status", user.getStatus(),
+                "deletedAt", user.getDeletedAt()
+        );
     }
 }

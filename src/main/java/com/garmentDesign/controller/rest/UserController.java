@@ -93,4 +93,10 @@ public class UserController {
     public ResponseEntity<?> exportUserData(@PathVariable String idUser) {
         return ResponseEntity.ok(service.exportUserData(idUser));
     }
+    
+    // Delete account - soft delete
+    @DeleteMapping("/me/{idUser}/delete-account")
+    public ResponseEntity<?> deleteAccount(@PathVariable String idUser) {
+        return ResponseEntity.ok(service.deleteAccount(idUser));
+    }
 }
