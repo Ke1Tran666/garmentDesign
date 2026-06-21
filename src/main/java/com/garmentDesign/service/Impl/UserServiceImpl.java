@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.garmentDesign.dto.user.UpdateProfileRequest;
 import com.garmentDesign.entity.User;
+import com.garmentDesign.entity.UserAddress;
 import com.garmentDesign.entity.UserAuthProvider;
 import com.garmentDesign.repository.UserAddressRepository;
 import com.garmentDesign.repository.UserAuthProviderRepository;
@@ -239,7 +240,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void delete(String id) {
-        repository.deleteById(id);
+    	deleteAccount(id);
     }
     
     //    Delete Avatar
@@ -381,6 +382,79 @@ public class UserServiceImpl implements UserService {
 
         return Map.of(
                 "message", "Đổi mật khẩu thành công"
+        );
+    }
+    
+    @Override
+    public Map<String, Object> exportUserData(String idUser) {
+
+        User user = repository.findById(idUser)
+                .orElseThrow(() ->
+                        new RuntimeException("Không tìm thấy người dùng"));
+
+        List<UserAuthProvider> authProviders =
+                authProviderRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        List<UserAddress> addresses =
+                addressRepository
+                        .findByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        // Không export password
+        authProviders.forEach(provider ->
+                provider.setPassword(null)
+        );
+
+        Map<String, Object> result = new HashMap<>();
+
+        result.put("user", user);
+        result.put("authProviders", authProviders);
+        result.put("addresses", addresses);
+        result.put("defaultAddress", user.getDefaultAddress());
+
+        return result;
+    }
+    
+    @Override
+    public Map<String, Object> deleteAccount(String idUser) {
+        User user = repository.findById(idUser)
+                .orElseThrow(() ->
+                        new RuntimeException("Không tìm thấy người dùng"));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // Soft delete user
+        user.setDeletedAt(now);
+        user.setUpdatedAt(now);
+        user.setStatus("delete");
+        user.setDefaultAddress(null);
+
+        // Soft delete auth providers
+        List<UserAuthProvider> authProviders =
+                authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        authProviders.forEach(provider -> {
+            provider.setDeletedAt(now);
+            provider.setUpdatedAt(now);
+        });
+
+        // Soft delete addresses
+        List<UserAddress> addresses =
+                addressRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+
+        addresses.forEach(address -> {
+            address.setDeletedAt(now);
+            address.setUpdatedAt(now);
+        });
+
+        authProviderRepository.saveAll(authProviders);
+        addressRepository.saveAll(addresses);
+        repository.save(user);
+
+        return Map.of(
+                "message", "Tài khoản đã được xóa",
+                "status", user.getStatus(),
+                "deletedAt", user.getDeletedAt()
         );
     }
 }
