@@ -41,4 +41,9 @@ public class ServiceOrderController {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
+    
+    @GetMapping("/user/{idUser}")
+    public List<ServiceOrder> getByUser(@PathVariable String idUser) {
+        return service.findByUserId(idUser);
+    }
 }

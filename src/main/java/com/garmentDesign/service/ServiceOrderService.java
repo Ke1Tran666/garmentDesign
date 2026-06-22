@@ -9,4 +9,5 @@ public interface ServiceOrderService {
     ServiceOrder save(ServiceOrder data);
     ServiceOrder update(Long id, ServiceOrder data);
     void delete(Long id);
+    List<ServiceOrder> findByUserId(String idUser);
 }
