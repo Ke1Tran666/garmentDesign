@@ -43,4 +43,9 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     public void delete(Long id) {
         repository.deleteById(id);
     }
+    
+    @Override
+    public List<ServiceOrder> findByUserId(String idUser) {
+        return repository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+    }
 }
