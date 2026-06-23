@@ -23,6 +23,8 @@ public class Service {
 
     private String description;
     
+    private String tags;
+    
     private String status;
     
     @Column(name = "created_at")
@@ -33,6 +35,9 @@ public class Service {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+    
+    @Column(name = "service_code")
+    private String serviceCode;
     
     public Service() {}
     @PrePersist public void prePersist(){ createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }
@@ -52,6 +57,9 @@ public class Service {
     public String getDescription(){return description;} 
     public void setDescription(String description){this.description=description;}
     
+    public String getTags() {return tags;}
+    public void setTags(String tags) {this.tags = tags;}
+    
     public String getStatus(){return status;} 
     public void setStatus(String status){this.status=status;}
     
@@ -63,4 +71,7 @@ public class Service {
     
     public LocalDateTime getDeletedAt(){return deletedAt;} 
     public void setDeletedAt(LocalDateTime deletedAt){this.deletedAt=deletedAt;}
+    
+    public String getServiceCode() {return serviceCode;}
+    public void setServiceCode(String serviceCode) {this.serviceCode = serviceCode;}
 }

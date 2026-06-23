@@ -18,14 +18,26 @@ public class UserAuthProvider {
     private User user;
 
     private String provider;
-    private String providerId;
     private String email;
     private String phone;
     private String password;
+    
+    @Column(name = "provider_id")
+    private String providerId;
+
+    @Column(name = "email_verified_at")
     private LocalDateTime emailVerifiedAt;
+
+    @Column(name = "phone_verified_at")
     private LocalDateTime phoneVerifiedAt;
+
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
     public UserAuthProvider() {}

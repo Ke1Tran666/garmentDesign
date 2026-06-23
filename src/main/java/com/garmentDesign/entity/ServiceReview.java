@@ -12,13 +12,26 @@ public class ServiceReview {
 	private Long reviewId;
     @ManyToOne @JoinColumn(name = "service_order_id") private ServiceOrder serviceOrder;
     @ManyToOne @JoinColumn(name = "user_id") private User user;
+	@Column(name = "reviewer_name")
     private String reviewerName;
+	
     private Integer rating;
+    
+    @Column(name = "review_content")
     private String reviewContent;
+    
+	@Column(name = "company_name")
     private String companyName;
+	
     private Boolean isPublic;
+    
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
     
     public ServiceReview() {}
