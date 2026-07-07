@@ -9,50 +9,25 @@ import java.util.List;
 @Table(name = "Users")
 public class User {
 
-    @Id
-    @Column(name = "id_User", length = 5)
-    private String idUser;
+    @Id	@Column(name = "id_User", length = 5)				private String idUser;
 
-    @Column(name = "user_code", unique = true, length = 20)
-    private String userCode;
+    @Column(name = "user_code", unique = true, length = 20)	private String userCode;
+    @Column(name = "full_name", length = 100)				private String fullName;
+    @Column(name = "avatar")								private String avatar;
+    @Column(name = "gender", length = 10)					private String gender;
+    @Column(name = "birthday")								private LocalDate birthday;
 
-    @Column(name = "full_name", length = 100)
-    private String fullName;
-
-    @Column(name = "avatar")
-    private String avatar;
-
-    @Column(name = "gender", length = 10)
-    private String gender;
-
-    @Column(name = "birthday")
-    private LocalDate birthday;
-
-    @ManyToOne
-    @JoinColumn(name = "id_role")
-    private Role role;
-
-    @ManyToOne
-    @JoinColumn(name = "default_address_id")
-    private UserAddress defaultAddress;
+    @ManyToOne	@JoinColumn(name = "id_role")				private Role role;
+    @ManyToOne	@JoinColumn(name = "default_address_id")	private UserAddress defaultAddress;
     
-    @OneToMany(mappedBy = "user")
-    private List<UserAddress> addresses;
+    @OneToMany(mappedBy = "user")							private List<UserAddress> addresses;
 
-    @Column(name = "status")
-    private String status;
+    @Column(name = "status")								private String status;
 
-    @Column(name = "last_login")
-    private LocalDateTime lastLogin;
-
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    @Column(name = "last_login")							private LocalDateTime lastLogin;
+    @Column(name = "created_at")							private LocalDateTime createdAt;
+    @Column(name = "updated_at") 							private LocalDateTime updatedAt;
+    @Column(name = "deleted_at")							private LocalDateTime deletedAt;
 
     public User() {}
 

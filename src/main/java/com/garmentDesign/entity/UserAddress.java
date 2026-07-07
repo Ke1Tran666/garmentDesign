@@ -7,29 +7,18 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 @Entity
 @Table(name = "User_Addresses")
 public class UserAddress {
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "address_id")
-	private Long addressId;
+	@Id	@GeneratedValue(strategy = GenerationType.IDENTITY)	@Column(name = "address_id")	private Long addressId;
 
-	@JsonIgnore
-	@ManyToOne
-	@JoinColumn(name = "id_User")
-	private User user;
+	@JsonIgnore	@ManyToOne	@JoinColumn(name = "id_User")		private User user;
 
-	@Column(name = "company_name")
-    private String companyName;
+	@Column(name = "company_name")								private String companyName;
+	
     private String address;
     private String note;
     
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    @Column(name = "created_at")								private LocalDateTime createdAt;
+    @Column(name = "updated_at")								private LocalDateTime updatedAt;
+    @Column(name = "deleted_at")								private LocalDateTime deletedAt;
 
     public UserAddress() {}
     @PrePersist public void prePersist(){ createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }

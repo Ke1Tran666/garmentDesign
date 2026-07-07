@@ -7,28 +7,15 @@ import java.time.LocalDateTime;
 @Table(name = "NewsletterSubscribers")
 public class NewsletterSubscriber {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_subscribers")
-    private Long idSubscribers;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY) @Column(name = "id_subscribers")	private Long idSubscribers;
 
-    @Column(name = "email", nullable = false, unique = true)
-    private String email;
+    @Column(name = "email", nullable = false, unique = true)	private String email;
+    @Column(name = "id_user", length = 5)						private String idUser;
+    @Column(name = "receive_notification", nullable = false)	private Boolean receiveNotification = true;
 
-    @Column(name = "id_user", length = 5)
-    private String idUser;
-
-    @Column(name = "receive_notification", nullable = false)
-    private Boolean receiveNotification = true;
-
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    @Column(name = "created_at")								private LocalDateTime createdAt;
+    @Column(name = "updated_at")								private LocalDateTime updatedAt;
+    @Column(name = "deleted_at")								private LocalDateTime deletedAt;
 
     @PrePersist
     public void prePersist() {
