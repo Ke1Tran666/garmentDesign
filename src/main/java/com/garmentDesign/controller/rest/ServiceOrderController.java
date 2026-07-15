@@ -1,5 +1,6 @@
 package com.garmentDesign.controller.rest;
 
+import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
 import com.garmentDesign.service.ServiceOrderService;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,19 @@ public class ServiceOrderController {
     @PutMapping("/{id}")
     public ServiceOrder update(@PathVariable Long id, @RequestBody ServiceOrder data) {
         return service.update(id, data);
+    }
+    
+    @PatchMapping("/{orderId}/user/{idUser}")
+    public ServiceOrder updateByUser(
+            @PathVariable Long orderId,
+            @PathVariable String idUser,
+            @RequestBody UserUpdateServiceOrderRequest request
+    ) {
+        return service.updateByUser(
+            orderId,
+            idUser,
+            request
+        );
     }
 
     @DeleteMapping("/{id}")

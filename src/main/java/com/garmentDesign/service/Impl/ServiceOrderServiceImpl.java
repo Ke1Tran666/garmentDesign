@@ -1,13 +1,17 @@
 package com.garmentDesign.service.Impl;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
 import com.garmentDesign.repository.ServiceOrderRepository;
 import com.garmentDesign.service.ServiceOrderService;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class ServiceOrderServiceImpl implements ServiceOrderService {
@@ -37,6 +41,103 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         ServiceOrder oldData = findById(id);
         BeanUtils.copyProperties(data, oldData);
         return repository.save(oldData);
+    }
+    
+    @Override
+    @Transactional
+    public ServiceOrder updateByUser(
+            Long orderId,
+            String idUser,
+            UserUpdateServiceOrderRequest request
+    ) {
+        ServiceOrder currentOrder = repository
+                .findById(orderId)
+                .orElseThrow(
+                    () -> new RuntimeException(
+                        "Không tìm thấy đơn hàng."
+                    )
+                );
+
+        if (
+            currentOrder.getUser() == null ||
+            !currentOrder.getUser().getIdUser().equals(idUser)
+        ) {
+            throw new RuntimeException(
+                "Bạn không có quyền chỉnh sửa đơn hàng này."
+            );
+        }
+
+        String productName =
+                request.getProductName() == null
+                    ? ""
+                    : request.getProductName().trim();
+
+        String unitType =
+                request.getUnitType() == null
+                    ? ""
+                    : request.getUnitType().trim();
+
+        BigDecimal quantity = request.getQuantity();
+
+        if (productName.isBlank()) {
+            throw new RuntimeException(
+                "Tên sản phẩm không được để trống."
+            );
+        }
+
+        if (unitType.isBlank()) {
+            throw new RuntimeException(
+                "Đơn vị tính không được để trống."
+            );
+        }
+
+        if (
+            quantity == null ||
+            quantity.compareTo(BigDecimal.ZERO) <= 0
+        ) {
+            throw new RuntimeException(
+                "Số lượng phải lớn hơn 0."
+            );
+        }
+
+        BigDecimal unitPrice =
+                currentOrder.getUnitPrice() == null
+                    ? BigDecimal.ZERO
+                    : currentOrder.getUnitPrice();
+
+        BigDecimal discountAmount =
+                currentOrder.getDiscountAmount() == null
+                    ? BigDecimal.ZERO
+                    : currentOrder.getDiscountAmount();
+
+        BigDecimal totalPrice = unitPrice
+                .multiply(quantity)
+                .subtract(discountAmount)
+                .max(BigDecimal.ZERO);
+
+        int affectedRows = repository.updateEditableFieldsByUser(
+            orderId,
+            idUser,
+            productName,
+            request.getCustomerRequest(),
+            unitType,
+            quantity,
+            totalPrice
+        );
+
+        if (affectedRows == 0) {
+            throw new RuntimeException(
+                "Không thể cập nhật đơn hàng."
+            );
+        }
+
+        return repository
+                .findById(orderId)
+                .orElseThrow(
+                    () -> new RuntimeException(
+                        "Không tìm thấy đơn hàng sau khi cập nhật."
+                    )
+                );
     }
 
     @Override
