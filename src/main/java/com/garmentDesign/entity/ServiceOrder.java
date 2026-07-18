@@ -9,29 +9,31 @@ import java.time.LocalDateTime;
 @Table(name = "Service_Orders")
 public class ServiceOrder {
 	
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "service_order_id")
-	private Long serviceOrderId;
-    @ManyToOne @JoinColumn(name = "id_User") private User user;
-    @ManyToOne @JoinColumn(name = "service_id") private Service service;
+	@Id @GeneratedValue(strategy = GenerationType.IDENTITY) @Column(name = "service_order_id") private Long serviceOrderId;
+	
+    @ManyToOne @JoinColumn(name = "id_User") 	private User user;   
+    @ManyToOne @JoinColumn(name = "service_id") private Service service;    
     @ManyToOne @JoinColumn(name = "address_id") private UserAddress address;
-    private String productName;
-    private String productImage;
-    private String customerRequest;
-    private String unitType;
+    
+    @Column(name = "product_name") 				private String productName;
+    @Column(name = "product_image") 			private String productImage;
+    @Column(name = "customer_request") 			private String customerRequest;
+    @Column(name = "unit_type")					private String unitType;
+    @Column(name = "unit_price") 				private BigDecimal unitPrice;
+    @Column(name = "discount_amount")			private BigDecimal discountAmount;
+    @Column(name = "total_price")				private BigDecimal totalPrice;
+    
     private BigDecimal quantity;
-    private BigDecimal unitPrice;
-    private BigDecimal discountAmount;
-    private BigDecimal totalPrice;
     private String status;
-    private LocalDate receivedDate;
-    private LocalDate completedDate;
-    private String createdBy;
-    private String updatedBy;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
+    
+    @Column(name = "received_date")				private LocalDate receivedDate;
+    @Column(name = "completed_date")			private LocalDate completedDate;
+    @Column(name = "created_by")				private String createdBy;
+    @Column(name = "updated_by")				private String updatedBy;
+    
+    @Column(name = "created_at")				private LocalDateTime createdAt;
+    @Column(name = "updated_at")				private LocalDateTime updatedAt;
+    @Column(name = "deleted_at")				private LocalDateTime deletedAt;
     
     public ServiceOrder() {}
     @PrePersist public void prePersist(){ createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }

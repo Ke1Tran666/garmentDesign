@@ -9,24 +9,23 @@ import jakarta.persistence.GeneratedValue;
 @Entity
 @Table(name = "User_Auth_Providers")
 public class UserAuthProvider {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Id	@GeneratedValue(strategy = GenerationType.IDENTITY)	private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "id_user")
-    private User user;
+    @ManyToOne	@JoinColumn(name = "id_user")		private User user;
 
     private String provider;
-    private String providerId;
     private String email;
     private String phone;
     private String password;
-    private LocalDateTime emailVerifiedAt;
-    private LocalDateTime phoneVerifiedAt;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
+    
+    @Column(name = "provider_id")					private String providerId;
+
+    @Column(name = "email_verified_at")				private LocalDateTime emailVerifiedAt;
+    @Column(name = "phone_verified_at")				private LocalDateTime phoneVerifiedAt;
+
+    @Column(name = "created_at")					private LocalDateTime createdAt;
+    @Column(name = "updated_at")					private LocalDateTime updatedAt;
+    @Column(name = "deleted_at")					private LocalDateTime deletedAt;
 
     public UserAuthProvider() {}
     @PrePersist public void prePersist(){ createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }
