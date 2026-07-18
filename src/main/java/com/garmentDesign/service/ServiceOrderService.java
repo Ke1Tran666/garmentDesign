@@ -1,5 +1,6 @@
 package com.garmentDesign.service;
 
+import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
 import java.util.List;
@@ -16,4 +17,10 @@ public interface ServiceOrderService {
     	);
     void delete(Long id);
     List<ServiceOrder> findByUserId(String idUser);
+    
+    ServiceOrder updateAddressByUser(
+    	    Long orderId,
+    	    String idUser,
+    	    UserUpdateOrderAddressRequest request
+    	);
 }

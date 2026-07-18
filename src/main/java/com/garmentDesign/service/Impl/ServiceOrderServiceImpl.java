@@ -6,20 +6,29 @@ import java.util.List;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
+import com.garmentDesign.entity.UserAddress;
 import com.garmentDesign.repository.ServiceOrderRepository;
+import com.garmentDesign.repository.UserAddressRepository;
 import com.garmentDesign.service.ServiceOrderService;
 
 import jakarta.transaction.Transactional;
 
 @Service
 public class ServiceOrderServiceImpl implements ServiceOrderService {
-    private final ServiceOrderRepository repository;
+	private final ServiceOrderRepository repository;
+	private final UserAddressRepository addressRepository;
 
-    public ServiceOrderServiceImpl(ServiceOrderRepository repository) {
-        this.repository = repository;
-    }
+	public ServiceOrderServiceImpl(
+	        ServiceOrderRepository repository,
+	        UserAddressRepository addressRepository
+	) {
+	    this.repository = repository;
+	    this.addressRepository =
+	            addressRepository;
+	}
 
     @Override
     public List<ServiceOrder> findAll() {
@@ -115,15 +124,16 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 .subtract(discountAmount)
                 .max(BigDecimal.ZERO);
 
-        int affectedRows = repository.updateEditableFieldsByUser(
-            orderId,
-            idUser,
-            productName,
-            request.getCustomerRequest(),
-            unitType,
-            quantity,
-            totalPrice
-        );
+        int affectedRows =
+                repository.updateEditableFieldsByUser(
+                    orderId,
+                    idUser,
+                    productName,
+                    request.getCustomerRequest(),
+                    unitType,
+                    quantity,
+                    totalPrice
+                );
 
         if (affectedRows == 0) {
             throw new RuntimeException(
@@ -138,6 +148,71 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                         "Không tìm thấy đơn hàng sau khi cập nhật."
                     )
                 );
+    }
+    
+    @Override
+    @Transactional
+    public ServiceOrder updateAddressByUser(
+            Long orderId,
+            String idUser,
+            UserUpdateOrderAddressRequest request
+    ) {
+        if (request == null || request.getAddressId() == null) {
+            throw new RuntimeException(
+                "Vui lòng chọn địa chỉ nhận hàng."
+            );
+        }
+
+        ServiceOrder currentOrder = repository
+            .findById(orderId)
+            .orElseThrow(
+                () -> new RuntimeException(
+                    "Không tìm thấy đơn hàng."
+                )
+            );
+
+        if (
+            currentOrder.getDeletedAt() != null ||
+            currentOrder.getUser() == null ||
+            !idUser.equals(
+                currentOrder.getUser().getIdUser()
+            )
+        ) {
+            throw new RuntimeException(
+                "Bạn không có quyền cập nhật địa chỉ của đơn hàng này."
+            );
+        }
+
+        UserAddress selectedAddress = addressRepository
+            .findByAddressIdAndUser_IdUserAndDeletedAtIsNull(
+                request.getAddressId(),
+                idUser
+            )
+            .orElseThrow(
+                () -> new RuntimeException(
+                    "Địa chỉ không tồn tại hoặc không thuộc người dùng hiện tại."
+                )
+            );
+
+        int affectedRows = repository.updateAddressByUser(
+            orderId,
+            idUser,
+            selectedAddress
+        );
+
+        if (affectedRows == 0) {
+            throw new RuntimeException(
+                "Không thể cập nhật địa chỉ đơn hàng."
+            );
+        }
+
+        return repository
+            .findById(orderId)
+            .orElseThrow(
+                () -> new RuntimeException(
+                    "Không tìm thấy đơn hàng sau khi cập nhật địa chỉ."
+                )
+            );
     }
 
     @Override

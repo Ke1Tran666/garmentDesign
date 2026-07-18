@@ -1,5 +1,6 @@
 package com.garmentDesign.controller.rest;
 
+import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
 import com.garmentDesign.service.ServiceOrderService;
@@ -44,6 +45,19 @@ public class ServiceOrderController {
             @RequestBody UserUpdateServiceOrderRequest request
     ) {
         return service.updateByUser(
+            orderId,
+            idUser,
+            request
+        );
+    }
+    
+    @PatchMapping("/{orderId}/user/{idUser}/address")
+    public ServiceOrder updateAddressByUser(
+            @PathVariable Long orderId,
+            @PathVariable String idUser,
+            @RequestBody UserUpdateOrderAddressRequest request
+    ) {
+        return service.updateAddressByUser(
             orderId,
             idUser,
             request

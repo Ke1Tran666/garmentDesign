@@ -1,6 +1,7 @@
 package com.garmentDesign.repository;
 
 import com.garmentDesign.entity.ServiceOrder;
+import com.garmentDesign.entity.UserAddress;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -55,5 +56,22 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 			    @Param("orderId") Long orderId,
 			    @Param("idUser") String idUser,
 			    @Param("productImage") String productImage
+			);
+	 
+	 @Modifying(
+			    clearAutomatically = true,
+			    flushAutomatically = true
+			)
+			@Query("""
+			    UPDATE ServiceOrder serviceOrder
+			    SET serviceOrder.address = :address
+			    WHERE serviceOrder.serviceOrderId = :orderId
+			      AND serviceOrder.user.idUser = :idUser
+			      AND serviceOrder.deletedAt IS NULL
+			""")
+			int updateAddressByUser(
+			    @Param("orderId") Long orderId,
+			    @Param("idUser") String idUser,
+			    @Param("address") UserAddress address
 			);
 }
