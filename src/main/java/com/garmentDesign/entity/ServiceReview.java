@@ -6,20 +6,21 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "Service_Reviews")
 public class ServiceReview {
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "review_id")
-	private Long reviewId;
-    @ManyToOne @JoinColumn(name = "service_order_id") private ServiceOrder serviceOrder;
-    @ManyToOne @JoinColumn(name = "user_id") private User user;
-    private String reviewerName;
-    private Integer rating;
-    private String reviewContent;
-    private String companyName;
+	@Id	@GeneratedValue(strategy = GenerationType.IDENTITY)	@Column(name = "review_id")	private Long reviewId;
+	
+    @ManyToOne @JoinColumn(name = "service_order_id") 		private ServiceOrder serviceOrder;
+    @ManyToOne @JoinColumn(name = "user_id") 				private User user;
+    
+	@Column(name = "reviewer_name")							private String reviewerName;
+    @Column(name = "review_content")						private String reviewContent;
+	@Column(name = "company_name")							private String companyName;
+	
+	private Integer rating;
     private Boolean isPublic;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
+    
+    @Column(name = "created_at")							private LocalDateTime createdAt;
+    @Column(name = "updated_at")							private LocalDateTime updatedAt;
+    @Column(name = "deleted_at")							private LocalDateTime deletedAt;
     
     public ServiceReview() {}
     @PrePersist public void prePersist(){ createdAt = LocalDateTime.now(); updatedAt = LocalDateTime.now(); }

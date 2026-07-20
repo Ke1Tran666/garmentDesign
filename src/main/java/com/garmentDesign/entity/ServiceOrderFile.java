@@ -6,16 +6,16 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "Service_Order_Files")
 public class ServiceOrderFile {
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "file_id")
-	private Long fileId;
-    @ManyToOne @JoinColumn(name = "service_order_id") private ServiceOrder serviceOrder;
-    private String fileType;
-    private String fileName;
-    private String filePath;
-    private String uploadedBy;
-    private LocalDateTime uploadedAt;
+	@Id @GeneratedValue(strategy = GenerationType.IDENTITY) @Column(name = "file_id") private Long fileId;
+	
+    @ManyToOne @JoinColumn(name = "service_order_id") 	private ServiceOrder serviceOrder;
+    
+    @Column(name = "file_type")							private String fileType;
+    @Column(name = "file_name")							private String fileName;
+    @Column(name = "file_path")							private String filePath;
+    @Column(name = "uploaded_by")						private String uploadedBy;
+    @Column(name = "uploaded_at")						private LocalDateTime uploadedAt;
+    
     private String note;
     
     public ServiceOrderFile() {}
