@@ -5,13 +5,20 @@ import java.util.List;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import com.garmentDesign.dto.serviceorder.UserRemoveServiceOrderResponse;
 import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
 import com.garmentDesign.entity.UserAddress;
 import com.garmentDesign.repository.ServiceOrderRepository;
+import com.garmentDesign.repository.ServiceReviewRepository;
 import com.garmentDesign.repository.UserAddressRepository;
+import com.garmentDesign.service.ServiceOrderAttachmentService;
 import com.garmentDesign.service.ServiceOrderService;
 
 import jakarta.transaction.Transactional;
@@ -20,14 +27,25 @@ import jakarta.transaction.Transactional;
 public class ServiceOrderServiceImpl implements ServiceOrderService {
 	private final ServiceOrderRepository repository;
 	private final UserAddressRepository addressRepository;
+	
+	private static final String CANCELLED_STATUS = "inactive";
+
+	private final ServiceOrderAttachmentService attachmentService;
+	private final ServiceReviewRepository reviewRepository;
 
 	public ServiceOrderServiceImpl(
 	        ServiceOrderRepository repository,
-	        UserAddressRepository addressRepository
+	        UserAddressRepository addressRepository,
+	        ServiceOrderAttachmentService attachmentService,
+	        ServiceReviewRepository reviewRepository
 	) {
 	    this.repository = repository;
 	    this.addressRepository =
-	            addressRepository;
+	        addressRepository;
+	    this.attachmentService =
+	        attachmentService;
+	    this.reviewRepository =
+	        reviewRepository;
 	}
 
     @Override
@@ -221,7 +239,133 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     }
     
     @Override
-    public List<ServiceOrder> findByUserId(String idUser) {
-        return repository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+    @Transactional
+    public UserRemoveServiceOrderResponse
+            removeByUser(
+                Long orderId,
+                String idUser
+            ) {
+        if (
+            orderId == null ||
+            idUser == null ||
+            idUser.isBlank()
+        ) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Thông tin đơn hàng hoặc người dùng không hợp lệ."
+            );
+        }
+
+        ServiceOrder currentOrder =
+            repository
+                .findOwnedOrderForUpdate(
+                    orderId,
+                    idUser
+                )
+                .orElseThrow(
+                    () ->
+                        new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Không tìm thấy đơn hàng hoặc đơn không thuộc người dùng hiện tại."
+                        )
+                );
+
+        if (currentOrder.getDeletedAt() != null) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Đơn hàng đã được hủy trước đó."
+            );
+        }
+
+        boolean createdByIsEmpty =
+            currentOrder.getCreatedBy() == null ||
+            currentOrder
+                .getCreatedBy()
+                .isBlank();
+
+        boolean updatedByIsEmpty =
+            currentOrder.getUpdatedBy() == null ||
+            currentOrder
+                .getUpdatedBy()
+                .isBlank();
+
+        boolean hasNoReceiver =
+            createdByIsEmpty &&
+            updatedByIsEmpty;
+
+        /*
+         * Chưa có nhân viên nhận:
+         * xóa vĩnh viễn.
+         */
+        if (hasNoReceiver) {
+            Long deletedOrderId =
+                currentOrder
+                    .getServiceOrderId();
+
+            attachmentService
+                .deleteAllForPermanentOrder(
+                    currentOrder
+                );
+
+            reviewRepository
+                .deleteByServiceOrder_ServiceOrderId(
+                    deletedOrderId
+                );
+
+            reviewRepository.flush();
+
+            repository.delete(currentOrder);
+            repository.flush();
+
+            return new UserRemoveServiceOrderResponse(
+                deletedOrderId,
+                "DELETED",
+                null,
+                "Đơn hàng đã được xóa vĩnh viễn."
+            );
+        }
+
+        /*
+         * Đã có nhân viên nhận:
+         * chỉ hủy đơn, vẫn giữ dữ liệu.
+         */
+        int affectedRows =
+            repository
+                .cancelAssignedOrderByUser(
+                    orderId,
+                    idUser,
+                    CANCELLED_STATUS,
+                    LocalDateTime.now()
+                );
+
+        if (affectedRows == 0) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Không thể hủy đơn hàng."
+            );
+        }
+
+        ServiceOrder cancelledOrder =
+            repository
+                .findById(orderId)
+                .orElseThrow(
+                    () ->
+                        new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Không tìm thấy đơn hàng sau khi hủy."
+                        )
+                );
+
+        return new UserRemoveServiceOrderResponse(
+        	    orderId,
+        	    "CANCELLED",
+        	    cancelledOrder,
+        	    "Đơn hàng đã được hủy."
+        	);
+    }
+    
+    @Override
+    public List<ServiceOrder>findByUserId(String idUser) {
+        return repository.findVisibleOrdersByUser(idUser);
     }
 }

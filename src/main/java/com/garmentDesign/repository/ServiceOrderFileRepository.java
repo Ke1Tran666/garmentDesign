@@ -10,4 +10,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ServiceOrderFileRepository extends JpaRepository<ServiceOrderFile, Long> {
 	List<ServiceOrderFile> findByServiceOrder_ServiceOrderId(Long serviceOrderId);
+	
+	void deleteByServiceOrder_ServiceOrderId(Long serviceOrderId);
 }

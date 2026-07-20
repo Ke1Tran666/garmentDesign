@@ -23,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Comparator;
+import java.util.stream.Stream;
+
 @Service
 public class ServiceOrderAttachmentService {
 
@@ -580,6 +583,102 @@ public class ServiceOrderAttachmentService {
                 "Không thể xóa file khỏi hệ thống.",
                 exception
             );
+        }
+    }
+    
+    @Transactional
+    public void deleteAllForPermanentOrder(
+            ServiceOrder order
+    ) {
+        if (
+            order == null ||
+            order.getServiceOrderId() == null ||
+            order.getUser() == null
+        ) {
+            throw new RuntimeException(
+                "Thông tin đơn hàng không hợp lệ."
+            );
+        }
+
+        String userCode =
+            order.getUser().getUserCode();
+
+        if (
+            userCode == null ||
+            userCode.isBlank()
+        ) {
+            userCode =
+                order.getUser().getIdUser();
+        }
+
+        String safeUserCode =
+            sanitizeFolderName(userCode);
+
+        String orderFolderName =
+            safeUserCode
+            + "_"
+            + order.getServiceOrderId();
+
+        Path userDirectory =
+            uploadRoot
+                .resolve(safeUserCode)
+                .normalize();
+
+        Path orderDirectory =
+            userDirectory
+                .resolve(orderFolderName)
+                .normalize();
+
+        validatePath(userDirectory);
+        validatePath(orderDirectory);
+
+        /*
+         * Xóa file vật lý trước. Nếu không xóa
+         * được thì dừng, chưa xóa database.
+         */
+        if (Files.exists(orderDirectory)) {
+            try (
+                Stream<Path> pathStream =
+                    Files.walk(orderDirectory)
+            ) {
+                List<Path> paths =
+                    pathStream
+                        .sorted(
+                            Comparator
+                                .reverseOrder()
+                        )
+                        .toList();
+
+                for (Path path : paths) {
+                    Files.deleteIfExists(path);
+                }
+            } catch (Exception exception) {
+                throw new RuntimeException(
+                    "Không thể xóa thư mục file của đơn hàng.",
+                    exception
+                );
+            }
+        }
+
+        fileRepository
+            .deleteByServiceOrder_ServiceOrderId(
+                order.getServiceOrderId()
+            );
+
+        fileRepository.flush();
+
+        /*
+         * Xóa thư mục user nếu đã rỗng.
+         */
+        try {
+            Files.deleteIfExists(
+                userDirectory
+            );
+        } catch (Exception ignored) {
+            /*
+             * User còn đơn khác thì thư mục
+             * không rỗng, không cần xóa.
+             */
         }
     }
 }

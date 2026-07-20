@@ -1,5 +1,6 @@
 package com.garmentDesign.controller.rest;
 
+import com.garmentDesign.dto.serviceorder.UserRemoveServiceOrderResponse;
 import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
@@ -69,6 +70,11 @@ public class ServiceOrderController {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
+    
+    @DeleteMapping("/{orderId}/user/{idUser}")
+    public ResponseEntity<UserRemoveServiceOrderResponse> removeByUser(@PathVariable Long orderId,@PathVariable String idUser) {
+    	    return ResponseEntity.ok(service.removeByUser(orderId,idUser));
+    	}
     
     @GetMapping("/user/{idUser}")
     public List<ServiceOrder> getByUser(@PathVariable String idUser) {

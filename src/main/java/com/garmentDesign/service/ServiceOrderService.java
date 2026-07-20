@@ -1,5 +1,6 @@
 package com.garmentDesign.service;
 
+import com.garmentDesign.dto.serviceorder.UserRemoveServiceOrderResponse;
 import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
@@ -17,6 +18,8 @@ public interface ServiceOrderService {
     	);
     void delete(Long id);
     List<ServiceOrder> findByUserId(String idUser);
+    
+    UserRemoveServiceOrderResponse removeByUser(Long orderId,String idUser);
     
     ServiceOrder updateAddressByUser(
     	    Long orderId,
