@@ -10,4 +10,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ServiceReviewRepository extends JpaRepository<ServiceReview, Long> {
 	List<ServiceReview> findByServiceOrder_ServiceOrderIdAndDeletedAtIsNull(Long serviceOrderId);
+	
+	void deleteByServiceOrder_ServiceOrderId(Long serviceOrderId);
 }

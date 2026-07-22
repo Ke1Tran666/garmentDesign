@@ -1,5 +1,8 @@
 package com.garmentDesign.controller.rest;
 
+import com.garmentDesign.dto.serviceorder.UserRemoveServiceOrderResponse;
+import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
+import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
 import com.garmentDesign.service.ServiceOrderService;
 import org.springframework.http.ResponseEntity;
@@ -35,12 +38,43 @@ public class ServiceOrderController {
     public ServiceOrder update(@PathVariable Long id, @RequestBody ServiceOrder data) {
         return service.update(id, data);
     }
+    
+    @PatchMapping("/{orderId}/user/{idUser}")
+    public ServiceOrder updateByUser(
+            @PathVariable Long orderId,
+            @PathVariable String idUser,
+            @RequestBody UserUpdateServiceOrderRequest request
+    ) {
+        return service.updateByUser(
+            orderId,
+            idUser,
+            request
+        );
+    }
+    
+    @PatchMapping("/{orderId}/user/{idUser}/address")
+    public ServiceOrder updateAddressByUser(
+            @PathVariable Long orderId,
+            @PathVariable String idUser,
+            @RequestBody UserUpdateOrderAddressRequest request
+    ) {
+        return service.updateAddressByUser(
+            orderId,
+            idUser,
+            request
+        );
+    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
+    
+    @DeleteMapping("/{orderId}/user/{idUser}")
+    public ResponseEntity<UserRemoveServiceOrderResponse> removeByUser(@PathVariable Long orderId,@PathVariable String idUser) {
+    	    return ResponseEntity.ok(service.removeByUser(orderId,idUser));
+    	}
     
     @GetMapping("/user/{idUser}")
     public List<ServiceOrder> getByUser(@PathVariable String idUser) {
