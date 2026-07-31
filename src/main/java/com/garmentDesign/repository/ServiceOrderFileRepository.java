@@ -12,4 +12,6 @@ public interface ServiceOrderFileRepository extends JpaRepository<ServiceOrderFi
 	List<ServiceOrderFile> findByServiceOrder_ServiceOrderId(Long serviceOrderId);
 	
 	void deleteByServiceOrder_ServiceOrderId(Long serviceOrderId);
+	
+	List<ServiceOrderFile> findByServiceOrder_User_IdUser(String idUser);
 }

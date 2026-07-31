@@ -405,9 +405,7 @@ public class ServiceOrderAttachmentService {
         }
     }
 
-    private Map<String, Object> toResponse(
-            ServiceOrderFile file
-    ) {
+    private Map<String, Object> toResponse(ServiceOrderFile file) {
         Map<String, Object> response =
                 new HashMap<>();
 
@@ -418,6 +416,7 @@ public class ServiceOrderAttachmentService {
         response.put("uploadedBy", file.getUploadedBy());
         response.put("uploadedAt", file.getUploadedAt());
         response.put("note", file.getNote());
+        response.put("serviceOrderId",file.getServiceOrder().getServiceOrderId());
 
         response.put(
             "contentUrl",
@@ -680,5 +679,13 @@ public class ServiceOrderAttachmentService {
              * không rỗng, không cần xóa.
              */
         }
+    }
+    
+    public List<Map<String, Object>> findByUser(String idUser) {
+        return fileRepository
+            .findByServiceOrder_User_IdUser(idUser)
+            .stream()
+            .map(this::toResponse)
+            .toList();
     }
 }

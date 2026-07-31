@@ -105,8 +105,7 @@ public class ServiceOrderFileController {
 
     @GetMapping("/{fileId}/content")
     public ResponseEntity<Resource> getContent(
-            @PathVariable("fileId")
-            Long fileId
+            @PathVariable("fileId") Long fileId
     ) throws Exception {
         DownloadFile downloadFile =
                 service.loadFile(fileId);
@@ -177,8 +176,7 @@ public class ServiceOrderFileController {
     }
 
     private ContentDisposition createContentDisposition(
-            boolean inline,
-            String fileName
+            boolean inline,String fileName
     ) {
         ContentDisposition.Builder builder =
                 inline
@@ -195,17 +193,20 @@ public class ServiceOrderFileController {
     
     @DeleteMapping("/{fileId}/user/{idUser}")
     public ResponseEntity<Void> deleteFile(
-            @PathVariable("fileId")
-            Long fileId,
-
-            @PathVariable("idUser")
-            String idUser
+            @PathVariable("fileId") Long fileId,
+            @PathVariable("idUser") String idUser
     ) {
-        service.deleteFileByUser(
-            fileId,
-            idUser
-        );
+        service.deleteFileByUser(fileId,idUser);
 
         return ResponseEntity.noContent().build();
+    }
+    
+    @GetMapping("/user/{idUser}")
+    public ResponseEntity<List<Map<String, Object>>> findByUser(
+            @PathVariable("idUser") String idUser
+    ) {
+        return ResponseEntity.ok(
+            service.findByUser(idUser)
+        );
     }
 }
