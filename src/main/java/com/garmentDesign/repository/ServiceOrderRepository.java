@@ -153,4 +153,20 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 			    @Param("idUser")
 			    String idUser
 			);
+	 
+	 @Query("""
+			    SELECT serviceOrder
+			    FROM ServiceOrder serviceOrder
+			    LEFT JOIN FETCH serviceOrder.service
+			    WHERE serviceOrder.user.idUser = :idUser
+			      AND serviceOrder.completedDate IS NOT NULL
+			      AND serviceOrder.completedDate <= :currentDate
+			      AND serviceOrder.deletedAt IS NULL
+			    ORDER BY serviceOrder.completedDate DESC,
+			             serviceOrder.serviceOrderId DESC
+			""")
+			List<ServiceOrder> findReviewableOrdersByUser(
+			    @Param("idUser") String idUser,
+			    @Param("currentDate") java.time.LocalDate currentDate
+			);
 }
