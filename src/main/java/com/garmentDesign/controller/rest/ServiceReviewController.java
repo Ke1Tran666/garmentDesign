@@ -5,6 +5,7 @@ import com.garmentDesign.dto.servicereview.ServiceReviewRequest;
 import com.garmentDesign.dto.servicereview.ServiceReviewResponse;
 import com.garmentDesign.service.ServiceReviewService;
 
+import java.security.Principal;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,9 @@ public class ServiceReviewController {
         this.service = service;
     }
 
+    /*
+     * Nội dung công khai, không cần đăng nhập.
+     */
     @GetMapping("/public")
     public ResponseEntity<List<ServiceReviewResponse>>
             findPublicReviews() {
@@ -31,37 +35,44 @@ public class ServiceReviewController {
         );
     }
 
-    @GetMapping("/user/{idUser}")
+    /*
+     * Danh sách đánh giá của người đang đăng nhập.
+     */
+    @GetMapping("/me")
     public ResponseEntity<List<ServiceReviewResponse>>
-            findByUser(
-                @PathVariable("idUser")
-                String idUser
+            findMine(
+                Principal principal
             ) {
         return ResponseEntity.ok(
-            service.findByUser(idUser)
+            service.findByUser(
+                principal.getName()
+            )
         );
     }
 
-    @GetMapping("/user/{idUser}/orders")
+    /*
+     * Các đơn hàng người hiện tại có thể đánh giá.
+     */
+    @GetMapping("/me/orders")
     public ResponseEntity<List<ReviewableOrderResponse>>
-            findReviewableOrders(
-                @PathVariable("idUser")
-                String idUser
+            findMyReviewableOrders(
+                Principal principal
             ) {
         return ResponseEntity.ok(
-            service.findReviewableOrders(idUser)
+            service.findReviewableOrders(
+                principal.getName()
+            )
         );
     }
 
-    @PostMapping("/order/{orderId}/user/{idUser}")
+    /*
+     * Tạo đánh giá cho đơn hàng thuộc người hiện tại.
+     */
+    @PostMapping("/me/orders/{orderId}")
     public ResponseEntity<ServiceReviewResponse>
-            createByUser(
-                @PathVariable("orderId")
-                Long orderId,
-
-                @PathVariable("idUser")
-                String idUser,
-
+            createMine(
+                @PathVariable Long orderId,
+                Principal principal,
                 @RequestBody
                 ServiceReviewRequest request
             ) {
@@ -70,46 +81,47 @@ public class ServiceReviewController {
             .body(
                 service.createByUser(
                     orderId,
-                    idUser,
+                    principal.getName(),
                     request
                 )
             );
     }
 
-    @PutMapping("/{reviewId}/user/{idUser}")
+    /*
+     * Cập nhật đánh giá thuộc người hiện tại.
+     */
+    @PutMapping("/me/{reviewId}")
     public ResponseEntity<ServiceReviewResponse>
-            updateByUser(
-                @PathVariable("reviewId")
-                Long reviewId,
-
-                @PathVariable("idUser")
-                String idUser,
-
+            updateMine(
+                @PathVariable Long reviewId,
+                Principal principal,
                 @RequestBody
                 ServiceReviewRequest request
             ) {
         return ResponseEntity.ok(
             service.updateByUser(
                 reviewId,
-                idUser,
+                principal.getName(),
                 request
             )
         );
     }
 
-    @DeleteMapping("/{reviewId}/user/{idUser}")
-    public ResponseEntity<Void> deleteByUser(
-            @PathVariable("reviewId")
-            Long reviewId,
-
-            @PathVariable("idUser")
-            String idUser
+    /*
+     * Xóa mềm đánh giá thuộc người hiện tại.
+     */
+    @DeleteMapping("/me/{reviewId}")
+    public ResponseEntity<Void> deleteMine(
+            @PathVariable Long reviewId,
+            Principal principal
     ) {
         service.deleteByUser(
             reviewId,
-            idUser
+            principal.getName()
         );
 
-        return ResponseEntity.noContent().build();
+        return ResponseEntity
+            .noContent()
+            .build();
     }
 }
