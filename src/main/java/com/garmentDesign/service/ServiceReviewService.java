@@ -8,23 +8,15 @@ import java.util.List;
 
 public interface ServiceReviewService {
 
-    List<ReviewableOrderResponse> findReviewableOrders(String idUser);
+	List<ReviewableOrderResponse> findReviewableOrders(String idUser);
 
-    List<ServiceReviewResponse> findByUser(String idUser);
+	List<ServiceReviewResponse> findByUser(String idUser);
 
-    List<ServiceReviewResponse> findPublicReviews();
+	List<ServiceReviewResponse> findPublicReviews();
 
-    ServiceReviewResponse createByUser(
-        Long orderId,
-        String idUser,
-        ServiceReviewRequest request
-    );
+	ServiceReviewResponse createByUser(Long orderId, String idUser, ServiceReviewRequest request);
 
-    ServiceReviewResponse updateByUser(
-        Long reviewId,
-        String idUser,
-        ServiceReviewRequest request
-    );
+	ServiceReviewResponse updateByUser(Long reviewId, String idUser, ServiceReviewRequest request);
 
-    void deleteByUser(Long reviewId,String idUser);
+	void deleteByUser(Long reviewId, String idUser);
 }

@@ -11,17 +11,10 @@ import com.garmentDesign.entity.UserAddress;
 @Repository
 public interface UserAddressRepository extends JpaRepository<UserAddress, Long> {
 
-    List<UserAddress> findByUser_IdUserAndDeletedAtIsNull(String idUser);
-    
-    Optional<UserAddress> findByUser_IdUserAndCompanyNameIgnoreCaseAndAddressIgnoreCase(
-    	    String idUser,
-    	    String companyName,
-    	    String address
-    	);
-    
-    Optional<UserAddress>
-    findByAddressIdAndUser_IdUserAndDeletedAtIsNull(
-        Long addressId,
-        String idUser
-    );
+	List<UserAddress> findByUser_IdUserAndDeletedAtIsNull(String idUser);
+
+	Optional<UserAddress> findByUser_IdUserAndCompanyNameIgnoreCaseAndAddressIgnoreCase(String idUser,
+			String companyName, String address);
+
+	Optional<UserAddress> findByAddressIdAndUser_IdUserAndDeletedAtIsNull(Long addressId, String idUser);
 }

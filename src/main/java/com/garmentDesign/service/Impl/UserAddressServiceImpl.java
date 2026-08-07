@@ -14,153 +14,121 @@ import org.springframework.security.access.AccessDeniedException;
 
 @Service
 public class UserAddressServiceImpl implements UserAddressService {
-    private final UserAddressRepository repository;
-    private final UserRepository userRepository;
+	private final UserAddressRepository repository;
+	private final UserRepository userRepository;
 
-    public UserAddressServiceImpl(
-            UserAddressRepository repository,
-            UserRepository userRepository
-        ) {
-            this.repository = repository;
-            this.userRepository = userRepository;
-        }
-    
-    private UserAddress requireOwnedAddress(
-            String idUser,
-            Long addressId
-    ) {
-        return repository
-            .findByAddressIdAndUser_IdUserAndDeletedAtIsNull(
-                addressId,
-                idUser
-            )
-            .orElseThrow(() ->
-                new AccessDeniedException("Không tìm thấy địa chỉ hoặc địa chỉ không thuộc người dùng hiện tại")
-            );
-    }
+	public UserAddressServiceImpl(UserAddressRepository repository, UserRepository userRepository) {
+		this.repository = repository;
+		this.userRepository = userRepository;
+	}
 
-    @Override
-    public List<UserAddress> findAll() {
-        return repository.findAll();
-    }
-    
-    @Override
-    public List<UserAddress> findByUserId(String idUser) {
-        return repository.findByUser_IdUserAndDeletedAtIsNull(idUser);
-    }
+	private UserAddress requireOwnedAddress(String idUser, Long addressId) {
+		return repository.findByAddressIdAndUser_IdUserAndDeletedAtIsNull(addressId, idUser).orElseThrow(
+				() -> new AccessDeniedException("Không tìm thấy địa chỉ hoặc địa chỉ không thuộc người dùng hiện tại"));
+	}
 
-    @Override
-    public UserAddress findById(Long id) {
-        return repository.findById(id).orElseThrow(() -> new RuntimeException("Không tìm thấy dữ liệu với id: " + id));
-    }
+	@Override
+	public List<UserAddress> findAll() {
+		return repository.findAll();
+	}
 
-    @Override
-    public UserAddress save(UserAddress data) {
-        return repository.save(data);
-    }
-    
-    @Override
-    public UserAddress createByUser(String idUser, UserAddress data) {
-        User user = userRepository.findById(idUser)
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + idUser));
+	@Override
+	public List<UserAddress> findByUserId(String idUser) {
+		return repository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+	}
 
-        UserAddress oldAddress = repository
-            .findByUser_IdUserAndCompanyNameIgnoreCaseAndAddressIgnoreCase(
-                idUser,
-                data.getCompanyName(),
-                data.getAddress()
-            )
-            .orElse(null);
+	@Override
+	public UserAddress findById(Long id) {
+		return repository.findById(id).orElseThrow(() -> new RuntimeException("Không tìm thấy dữ liệu với id: " + id));
+	}
 
-        if (oldAddress != null) {
-            oldAddress.setDeletedAt(null);
-            oldAddress.setNote(data.getNote());
-            oldAddress.setCompanyName(data.getCompanyName());
-            oldAddress.setAddress(data.getAddress());
+	@Override
+	public UserAddress save(UserAddress data) {
+		return repository.save(data);
+	}
 
-            return repository.save(oldAddress);
-        }
+	@Override
+	public UserAddress createByUser(String idUser, UserAddress data) {
+		User user = userRepository.findById(idUser)
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + idUser));
 
-        data.setUser(user);
-        data.setAddressId(null);
-        data.setDeletedAt(null);
+		UserAddress oldAddress = repository.findByUser_IdUserAndCompanyNameIgnoreCaseAndAddressIgnoreCase(idUser,
+				data.getCompanyName(), data.getAddress()).orElse(null);
 
-        return repository.save(data);
-    }
+		if (oldAddress != null) {
+			oldAddress.setDeletedAt(null);
+			oldAddress.setNote(data.getNote());
+			oldAddress.setCompanyName(data.getCompanyName());
+			oldAddress.setAddress(data.getAddress());
 
-    @Override
-    public UserAddress update(Long id, UserAddress data) {
-        UserAddress oldData = findById(id);
+			return repository.save(oldAddress);
+		}
 
-        oldData.setCompanyName(data.getCompanyName());
-        oldData.setAddress(data.getAddress());
-        oldData.setNote(data.getNote());
+		data.setUser(user);
+		data.setAddressId(null);
+		data.setDeletedAt(null);
 
-        return repository.save(oldData);
-    }
+		return repository.save(data);
+	}
 
-    @Override
-    public void delete(Long id) {
-        UserAddress oldData = findById(id);
+	@Override
+	public UserAddress update(Long id, UserAddress data) {
+		UserAddress oldData = findById(id);
 
-        oldData.setDeletedAt(java.time.LocalDateTime.now());
+		oldData.setCompanyName(data.getCompanyName());
+		oldData.setAddress(data.getAddress());
+		oldData.setNote(data.getNote());
 
-        repository.save(oldData);
-    }
-    
-    @Override
-    public UserAddress setDefaultAddress(String idUser, Long addressId) {
-        User user = userRepository.findById(idUser)
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + idUser));
+		return repository.save(oldData);
+	}
 
-        UserAddress address = repository.findById(addressId)
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy địa chỉ với id: " + addressId));
+	@Override
+	public void delete(Long id) {
+		UserAddress oldData = findById(id);
 
-        if (!address.getUser().getIdUser().equals(idUser)) {
-            throw new RuntimeException("Địa chỉ này không thuộc user hiện tại");
-        }
+		oldData.setDeletedAt(java.time.LocalDateTime.now());
 
-        user.setDefaultAddress(address);
-        userRepository.save(user);
+		repository.save(oldData);
+	}
 
-        return address;
-    }
-    
-    @Override
-    public UserAddress updateByUser(
-            String idUser,
-            Long addressId,
-            UserAddress data
-    ) {
-        UserAddress oldData =
-            requireOwnedAddress(
-                idUser,
-                addressId
-            );
+	@Override
+	public UserAddress setDefaultAddress(String idUser, Long addressId) {
+		User user = userRepository.findById(idUser)
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + idUser));
 
-        oldData.setCompanyName(data.getCompanyName());
+		UserAddress address = repository.findById(addressId)
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy địa chỉ với id: " + addressId));
 
-        oldData.setAddress(data.getAddress());
+		if (!address.getUser().getIdUser().equals(idUser)) {
+			throw new RuntimeException("Địa chỉ này không thuộc user hiện tại");
+		}
 
-        oldData.setNote(data.getNote());
+		user.setDefaultAddress(address);
+		userRepository.save(user);
 
-        return repository.save(oldData);
-    }
+		return address;
+	}
 
-    @Override
-    public void deleteByUser(
-            String idUser,
-            Long addressId
-    ) {
-        UserAddress address =
-            requireOwnedAddress(
-                idUser,
-                addressId
-            );
+	@Override
+	public UserAddress updateByUser(String idUser, Long addressId, UserAddress data) {
+		UserAddress oldData = requireOwnedAddress(idUser, addressId);
 
-        address.setDeletedAt(java.time.LocalDateTime.now());
+		oldData.setCompanyName(data.getCompanyName());
 
-        repository.save(address);
-    }
+		oldData.setAddress(data.getAddress());
+
+		oldData.setNote(data.getNote());
+
+		return repository.save(oldData);
+	}
+
+	@Override
+	public void deleteByUser(String idUser, Long addressId) {
+		UserAddress address = requireOwnedAddress(idUser, addressId);
+
+		address.setDeletedAt(java.time.LocalDateTime.now());
+
+		repository.save(address);
+	}
 
 }

@@ -15,89 +15,55 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/service-orders")
 public class ServiceOrderController {
-    private final ServiceOrderService service;
+	private final ServiceOrderService service;
 
-    public ServiceOrderController(ServiceOrderService service) {
-        this.service = service;
-    }
+	public ServiceOrderController(ServiceOrderService service) {
+		this.service = service;
+	}
 
-    @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    public List<ServiceOrder> getAll() {
-        return service.findAll();
-    }
+	@GetMapping
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public List<ServiceOrder> getAll() {
+		return service.findAll();
+	}
 
-    @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    public ServiceOrder getById(@PathVariable Long id) {
-        return service.findById(id);
-    }
-    
-    @GetMapping("/me")
-    public List<ServiceOrder> getMine(Principal principal) {
-        return service.findByUserId(
-            principal.getName()
-        );
-    }
+	@GetMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ServiceOrder getById(@PathVariable Long id) {
+		return service.findById(id);
+	}
 
-    @PostMapping("/me")
-    public ServiceOrder createMine(
-            Principal principal,
-            @RequestBody
-            UserCreateServiceOrderRequest request
-    ) {
-        return service.createByUser(
-            principal.getName(),
-            request
-        );
-    }
+	@GetMapping("/me")
+	public List<ServiceOrder> getMine(Principal principal) {
+		return service.findByUserId(principal.getName());
+	}
 
-    @PatchMapping("/me/{orderId}")
-    public ServiceOrder updateMine(
-            @PathVariable Long orderId,
-            Principal principal,
-            @RequestBody
-            UserUpdateServiceOrderRequest request
-    ) {
-        return service.updateByUser(
-            orderId,
-            principal.getName(),
-            request
-        );
-    }
-    
-    @PatchMapping("/me/{orderId}/address")
-    public ServiceOrder updateMyAddress(
-            @PathVariable Long orderId,
-            Principal principal,
-            @RequestBody
-            UserUpdateOrderAddressRequest request
-    ) {
-        return service.updateAddressByUser(
-            orderId,
-            principal.getName(),
-            request
-        );
-    }
+	@PostMapping("/me")
+	public ServiceOrder createMine(Principal principal, @RequestBody UserCreateServiceOrderRequest request) {
+		return service.createByUser(principal.getName(), request);
+	}
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        service.delete(id);
-        return ResponseEntity.noContent().build();
-    }
-    
-    @DeleteMapping("/me/{orderId}")
-    public ResponseEntity<UserRemoveServiceOrderResponse>
-            removeMine(
-                @PathVariable Long orderId,
-                Principal principal
-            ) {
-        return ResponseEntity.ok(
-            service.removeByUser(
-                orderId,
-                principal.getName()
-            )
-        );
-    }
+	@PatchMapping("/me/{orderId}")
+	public ServiceOrder updateMine(@PathVariable Long orderId, Principal principal,
+			@RequestBody UserUpdateServiceOrderRequest request) {
+		return service.updateByUser(orderId, principal.getName(), request);
+	}
+
+	@PatchMapping("/me/{orderId}/address")
+	public ServiceOrder updateMyAddress(@PathVariable Long orderId, Principal principal,
+			@RequestBody UserUpdateOrderAddressRequest request) {
+		return service.updateAddressByUser(orderId, principal.getName(), request);
+	}
+
+	@DeleteMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ResponseEntity<Void> delete(@PathVariable Long id) {
+		service.delete(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@DeleteMapping("/me/{orderId}")
+	public ResponseEntity<UserRemoveServiceOrderResponse> removeMine(@PathVariable Long orderId, Principal principal) {
+		return ResponseEntity.ok(service.removeByUser(orderId, principal.getName()));
+	}
 }

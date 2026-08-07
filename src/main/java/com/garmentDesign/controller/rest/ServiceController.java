@@ -9,35 +9,35 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/services")
 public class ServiceController {
-    private final ServiceService service;
+	private final ServiceService service;
 
-    public ServiceController(ServiceService service) {
-        this.service = service;
-    }
+	public ServiceController(ServiceService service) {
+		this.service = service;
+	}
 
-    @GetMapping
-    public List<Service> getAll() {
-        return service.findAll();
-    }
+	@GetMapping
+	public List<Service> getAll() {
+		return service.findAll();
+	}
 
-    @GetMapping("/{id}")
-    public Service getById(@PathVariable Long id) {
-        return service.findById(id);
-    }
+	@GetMapping("/{id}")
+	public Service getById(@PathVariable Long id) {
+		return service.findById(id);
+	}
 
-    @PostMapping
-    public Service create(@RequestBody Service data) {
-        return service.save(data);
-    }
+	@PostMapping
+	public Service create(@RequestBody Service data) {
+		return service.save(data);
+	}
 
-    @PutMapping("/{id}")
-    public Service update(@PathVariable Long id, @RequestBody Service data) {
-        return service.update(id, data);
-    }
+	@PutMapping("/{id}")
+	public Service update(@PathVariable Long id, @RequestBody Service data) {
+		return service.update(id, data);
+	}
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        service.delete(id);
-        return ResponseEntity.noContent().build();
-    }
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id) {
+		service.delete(id);
+		return ResponseEntity.noContent().build();
+	}
 }

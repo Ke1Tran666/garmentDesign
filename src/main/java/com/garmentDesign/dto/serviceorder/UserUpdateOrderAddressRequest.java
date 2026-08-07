@@ -2,13 +2,13 @@ package com.garmentDesign.dto.serviceorder;
 
 public class UserUpdateOrderAddressRequest {
 
-    private Long addressId;
+	private Long addressId;
 
-    public Long getAddressId() {
-        return addressId;
-    }
+	public Long getAddressId() {
+		return addressId;
+	}
 
-    public void setAddressId(Long addressId) {
-        this.addressId = addressId;
-    }
+	public void setAddressId(Long addressId) {
+		this.addressId = addressId;
+	}
 }

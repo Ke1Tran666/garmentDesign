@@ -11,17 +11,14 @@ import com.garmentDesign.entity.UserAuthProvider;
 @Repository
 public interface UserAuthProviderRepository extends JpaRepository<UserAuthProvider, Long> {
 
-    Optional<UserAuthProvider> findByEmailAndProvider(String email, String provider);
+	Optional<UserAuthProvider> findByEmailAndProvider(String email, String provider);
 
-    Optional<UserAuthProvider> findByPhoneAndProvider(String phone, String provider);
+	Optional<UserAuthProvider> findByPhoneAndProvider(String phone, String provider);
 
-    List<UserAuthProvider> findByUser_IdUserAndDeletedAtIsNull(String idUser);
-    
-    long countByUser_IdUserAndDeletedAtIsNull(String idUser);
-    
-    Optional<UserAuthProvider> findByUser_IdUserAndProviderAndDeletedAtIsNull(
-            String idUser,
-            String provider
-    );
-    
+	List<UserAuthProvider> findByUser_IdUserAndDeletedAtIsNull(String idUser);
+
+	long countByUser_IdUserAndDeletedAtIsNull(String idUser);
+
+	Optional<UserAuthProvider> findByUser_IdUserAndProviderAndDeletedAtIsNull(String idUser, String provider);
+
 }

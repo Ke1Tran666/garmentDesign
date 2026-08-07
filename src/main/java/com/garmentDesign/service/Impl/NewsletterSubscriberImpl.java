@@ -13,50 +13,45 @@ import java.util.Map;
 public class NewsletterSubscriberImpl implements NewsletterSubscriberService {
 	private final NewsletterSubscriberRepository repository;
 	private final MailService mailService;
-	
-	public NewsletterSubscriberImpl(
-	        NewsletterSubscriberRepository repository,
-	        MailService mailService
-	) {
-	    this.repository = repository;
-	    this.mailService = mailService;
+
+	public NewsletterSubscriberImpl(NewsletterSubscriberRepository repository, MailService mailService) {
+		this.repository = repository;
+		this.mailService = mailService;
 	}
-    
-    @Override
-    public Map<String, Object> subscribe(String email) {
 
-        if (email == null || email.trim().isEmpty()) {
-            throw new RuntimeException("Vui lòng nhập email");
-        }
+	@Override
+	public Map<String, Object> subscribe(String email) {
 
-        email = email.trim().toLowerCase();
+		if (email == null || email.trim().isEmpty()) {
+			throw new RuntimeException("Vui lòng nhập email");
+		}
 
-        if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-            throw new RuntimeException("Email không hợp lệ");
-        }
+		email = email.trim().toLowerCase();
 
-        if (repository.existsByEmailAndDeletedAtIsNull(email)) {
-            throw new RuntimeException("Email này đã đăng ký nhận tin");
-        }
+		if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+			throw new RuntimeException("Email không hợp lệ");
+		}
 
-        NewsletterSubscriber subscriber = new NewsletterSubscriber();
-        subscriber.setEmail(email);
-        subscriber.setReceiveNotification(true);
+		if (repository.existsByEmailAndDeletedAtIsNull(email)) {
+			throw new RuntimeException("Email này đã đăng ký nhận tin");
+		}
 
-        repository.save(subscriber);
+		NewsletterSubscriber subscriber = new NewsletterSubscriber();
+		subscriber.setEmail(email);
+		subscriber.setReceiveNotification(true);
 
-        try {
-            mailService.sendSubscribeSuccessEmail(email);
-        } catch (Exception e) {
-            System.err.println(
-                "Không thể gửi email xác nhận tới: " + email
-            );
-        }
+		repository.save(subscriber);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Đăng ký nhận tin thành công");
+		try {
+			mailService.sendSubscribeSuccessEmail(email);
+		} catch (Exception e) {
+			System.err.println("Không thể gửi email xác nhận tới: " + email);
+		}
 
-        return response;
-    }
+		Map<String, Object> response = new HashMap<>();
+		response.put("success", true);
+		response.put("message", "Đăng ký nhận tin thành công");
+
+		return response;
+	}
 }

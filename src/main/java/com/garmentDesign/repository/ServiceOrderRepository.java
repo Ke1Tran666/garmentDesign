@@ -22,87 +22,59 @@ import org.springframework.data.jpa.repository.Lock;
 @Repository
 public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long> {
 	List<ServiceOrder> findByUser_IdUserAndDeletedAtIsNull(String idUser);
-	
-	 @Modifying(
-		        clearAutomatically = true,
-		        flushAutomatically = true
-		    )
-		    @Query("""
-		        UPDATE ServiceOrder serviceOrder
-		        SET serviceOrder.productName = :productName,
-		            serviceOrder.customerRequest = :customerRequest,
-		            serviceOrder.unitType = :unitType,
-		            serviceOrder.quantity = :quantity,
-		            serviceOrder.totalPrice = :totalPrice
-		        WHERE serviceOrder.serviceOrderId = :orderId
-		          AND serviceOrder.user.idUser = :idUser
-		          AND serviceOrder.deletedAt IS NULL
-		    """)
-		    int updateEditableFieldsByUser(
-		        @Param("orderId") Long orderId,
-		        @Param("idUser") String idUser,
-		        @Param("productName") String productName,
-		        @Param("customerRequest") String customerRequest,
-		        @Param("unitType") String unitType,
-		        @Param("quantity") BigDecimal quantity,
-		        @Param("totalPrice") BigDecimal totalPrice
-		    );
-	 
-	 @Modifying(
-			    clearAutomatically = true,
-			    flushAutomatically = true
-			)
-			@Query("""
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+			    UPDATE ServiceOrder serviceOrder
+			    SET serviceOrder.productName = :productName,
+			        serviceOrder.customerRequest = :customerRequest,
+			        serviceOrder.unitType = :unitType,
+			        serviceOrder.quantity = :quantity,
+			        serviceOrder.totalPrice = :totalPrice
+			    WHERE serviceOrder.serviceOrderId = :orderId
+			      AND serviceOrder.user.idUser = :idUser
+			      AND serviceOrder.deletedAt IS NULL
+			""")
+	int updateEditableFieldsByUser(@Param("orderId") Long orderId, @Param("idUser") String idUser,
+			@Param("productName") String productName, @Param("customerRequest") String customerRequest,
+			@Param("unitType") String unitType, @Param("quantity") BigDecimal quantity,
+			@Param("totalPrice") BigDecimal totalPrice);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
 			    UPDATE ServiceOrder serviceOrder
 			    SET serviceOrder.productImage = :productImage
 			    WHERE serviceOrder.serviceOrderId = :orderId
 			      AND serviceOrder.user.idUser = :idUser
 			      AND serviceOrder.deletedAt IS NULL
 			""")
-			int updateProductImageByUser(
-			    @Param("orderId") Long orderId,
-			    @Param("idUser") String idUser,
-			    @Param("productImage") String productImage
-			);
-	 
-	 @Modifying(
-			    clearAutomatically = true,
-			    flushAutomatically = true
-			)
-			@Query("""
+	int updateProductImageByUser(@Param("orderId") Long orderId, @Param("idUser") String idUser,
+			@Param("productImage") String productImage);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
 			    UPDATE ServiceOrder serviceOrder
 			    SET serviceOrder.address = :address
 			    WHERE serviceOrder.serviceOrderId = :orderId
 			      AND serviceOrder.user.idUser = :idUser
 			      AND serviceOrder.deletedAt IS NULL
 			""")
-			int updateAddressByUser(
-			    @Param("orderId") Long orderId,
-			    @Param("idUser") String idUser,
-			    @Param("address") UserAddress address
-			);
-	 
-	 @Lock(LockModeType.PESSIMISTIC_WRITE)
-	 @Query("""
-	     SELECT serviceOrder
-	     FROM ServiceOrder serviceOrder
-	     WHERE serviceOrder.serviceOrderId = :orderId
-	       AND serviceOrder.user.idUser = :idUser
-	 """)
-	 Optional<ServiceOrder>
-	 findOwnedOrderForUpdate(
-	     @Param("orderId")
-	     Long orderId,
+	int updateAddressByUser(@Param("orderId") Long orderId, @Param("idUser") String idUser,
+			@Param("address") UserAddress address);
 
-	     @Param("idUser")
-	     String idUser
-	 );
-	 
-	 @Modifying(
-			    clearAutomatically = true,
-			    flushAutomatically = true
-			)
-			@Query("""
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+			    SELECT serviceOrder
+			    FROM ServiceOrder serviceOrder
+			    WHERE serviceOrder.serviceOrderId = :orderId
+			      AND serviceOrder.user.idUser = :idUser
+			""")
+	Optional<ServiceOrder> findOwnedOrderForUpdate(@Param("orderId") Long orderId,
+
+			@Param("idUser") String idUser);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
 			    UPDATE ServiceOrder serviceOrder
 			    SET serviceOrder.status = :status,
 			        serviceOrder.deletedAt = :deletedAt
@@ -121,21 +93,15 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 			          )
 			      )
 			""")
-			int cancelAssignedOrderByUser(
-			    @Param("orderId")
-			    Long orderId,
+	int cancelAssignedOrderByUser(@Param("orderId") Long orderId,
 
-			    @Param("idUser")
-			    String idUser,
+			@Param("idUser") String idUser,
 
-			    @Param("status")
-			    String status,
+			@Param("status") String status,
 
-			    @Param("deletedAt")
-			    LocalDateTime deletedAt
-			);
-	 
-	 @Query("""
+			@Param("deletedAt") LocalDateTime deletedAt);
+
+	@Query("""
 			    SELECT serviceOrder
 			    FROM ServiceOrder serviceOrder
 			    WHERE serviceOrder.user.idUser = :idUser
@@ -148,13 +114,9 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 			      )
 			    ORDER BY serviceOrder.serviceOrderId DESC
 			""")
-			List<ServiceOrder>
-			findVisibleOrdersByUser(
-			    @Param("idUser")
-			    String idUser
-			);
-	 
-	 @Query("""
+	List<ServiceOrder> findVisibleOrdersByUser(@Param("idUser") String idUser);
+
+	@Query("""
 			    SELECT serviceOrder
 			    FROM ServiceOrder serviceOrder
 			    LEFT JOIN FETCH serviceOrder.service
@@ -165,8 +127,6 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 			    ORDER BY serviceOrder.completedDate DESC,
 			             serviceOrder.serviceOrderId DESC
 			""")
-			List<ServiceOrder> findReviewableOrdersByUser(
-			    @Param("idUser") String idUser,
-			    @Param("currentDate") java.time.LocalDate currentDate
-			);
+	List<ServiceOrder> findReviewableOrdersByUser(@Param("idUser") String idUser,
+			@Param("currentDate") java.time.LocalDate currentDate);
 }

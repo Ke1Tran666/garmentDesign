@@ -20,146 +20,79 @@ import com.garmentDesign.service.UserService;
 @RequestMapping("/api/users")
 public class UserController {
 
-    private final UserService service;
+	private final UserService service;
 
-    public UserController(
-        UserService service
-    ) {
-        this.service = service;
-    }
+	public UserController(UserService service) {
+		this.service = service;
+	}
 
-    /*
-     * API quản trị
-     */
+	/*
+	 * API quản trị
+	 */
 
-    @GetMapping
-    @PreAuthorize(
-        "hasAnyRole('ADMIN', 'STAFF')"
-    )
-    public List<User> getAll() {
-        return service.findAll();
-    }
+	@GetMapping
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public List<User> getAll() {
+		return service.findAll();
+	}
 
-    @GetMapping("/{id}")
-    @PreAuthorize(
-        "hasAnyRole('ADMIN', 'STAFF')"
-    )
-    public User getById(
-        @PathVariable String id
-    ) {
-        return service.findById(id);
-    }
+	@GetMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public User getById(@PathVariable String id) {
+		return service.findById(id);
+	}
 
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public User create(
-        @RequestBody User data
-    ) {
-        return service.save(data);
-    }
+	@PostMapping
+	@PreAuthorize("hasRole('ADMIN')")
+	public User create(@RequestBody User data) {
+		return service.save(data);
+	}
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> delete(
-        @PathVariable String id
-    ) {
-        service.delete(id);
+	@DeleteMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<Void> delete(@PathVariable String id) {
+		service.delete(id);
 
-        return ResponseEntity
-            .noContent()
-            .build();
-    }
+		return ResponseEntity.noContent().build();
+	}
 
-    /*
-     * API người dùng hiện tại
-     */
+	/*
+	 * API người dùng hiện tại
+	 */
 
-    @GetMapping("/me")
-    public ResponseEntity<?> getMyProfile(
-        Authentication authentication
-    ) {
-        return ResponseEntity.ok(
-            service.getProfile(
-                authentication.getName()
-            )
-        );
-    }
+	@GetMapping("/me")
+	public ResponseEntity<?> getMyProfile(Authentication authentication) {
+		return ResponseEntity.ok(service.getProfile(authentication.getName()));
+	}
 
-    @PutMapping("/me")
-    public User updateMyProfile(
-        Authentication authentication,
-        @RequestBody
-        UpdateProfileRequest request
-    ) {
-        return service.updateProfile(
-            authentication.getName(),
-            request
-        );
-    }
+	@PutMapping("/me")
+	public User updateMyProfile(Authentication authentication, @RequestBody UpdateProfileRequest request) {
+		return service.updateProfile(authentication.getName(), request);
+	}
 
-    @PutMapping(
-        value = "/me/avatar",
-        consumes =
-            MediaType.MULTIPART_FORM_DATA_VALUE
-    )
-    public ResponseEntity<?> uploadAvatar(
-        Authentication authentication,
-        @RequestParam("file")
-        MultipartFile file
-    ) {
-        return ResponseEntity.ok(
-            service.uploadAvatar(
-                authentication.getName(),
-                file
-            )
-        );
-    }
+	@PutMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<?> uploadAvatar(Authentication authentication, @RequestParam("file") MultipartFile file) {
+		return ResponseEntity.ok(service.uploadAvatar(authentication.getName(), file));
+	}
 
-    @DeleteMapping("/me/avatar")
-    public ResponseEntity<?> deleteAvatar(
-        Authentication authentication
-    ) {
-        return ResponseEntity.ok(
-            service.deleteAvatar(
-                authentication.getName()
-            )
-        );
-    }
+	@DeleteMapping("/me/avatar")
+	public ResponseEntity<?> deleteAvatar(Authentication authentication) {
+		return ResponseEntity.ok(service.deleteAvatar(authentication.getName()));
+	}
 
-    @PutMapping("/me/change-password")
-    public ResponseEntity<?> changePassword(
-        Authentication authentication,
-        @RequestBody
-        Map<String, String> body
-    ) {
-        return ResponseEntity.ok(
-            service.changePassword(
-                authentication.getName(),
-                body.get("oldPassword"),
-                body.get("newPassword")
-            )
-        );
-    }
+	@PutMapping("/me/change-password")
+	public ResponseEntity<?> changePassword(Authentication authentication, @RequestBody Map<String, String> body) {
+		return ResponseEntity
+				.ok(service.changePassword(authentication.getName(), body.get("oldPassword"), body.get("newPassword")));
+	}
 
-    @GetMapping("/me/export-data")
-    public ResponseEntity<?> exportUserData(
-        Authentication authentication
-    ) {
-        return ResponseEntity.ok(
-            service.exportUserData(
-                authentication.getName()
-            )
-        );
-    }
+	@GetMapping("/me/export-data")
+	public ResponseEntity<?> exportUserData(Authentication authentication) {
+		return ResponseEntity.ok(service.exportUserData(authentication.getName()));
+	}
 
-    @DeleteMapping("/me/delete-account")
-    public ResponseEntity<?> deleteAccount(
-        Authentication authentication
-    ) {
-        return ResponseEntity.ok(
-            service.deleteAccount(
-                authentication.getName()
-            )
-        );
-    }
+	@DeleteMapping("/me/delete-account")
+	public ResponseEntity<?> deleteAccount(Authentication authentication) {
+		return ResponseEntity.ok(service.deleteAccount(authentication.getName()));
+	}
 }
