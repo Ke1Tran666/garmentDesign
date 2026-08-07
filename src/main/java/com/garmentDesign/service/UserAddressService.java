@@ -12,4 +12,8 @@ public interface UserAddressService {
     UserAddress update(Long id, UserAddress data);
     UserAddress setDefaultAddress(String idUser, Long addressId);
     void delete(Long id);
+    
+    UserAddress updateByUser(String idUser, Long addressId, UserAddress data);
+
+    void deleteByUser(String idUser, Long addressId);
 }

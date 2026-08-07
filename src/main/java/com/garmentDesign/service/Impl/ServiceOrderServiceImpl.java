@@ -20,6 +20,10 @@ import com.garmentDesign.repository.ServiceReviewRepository;
 import com.garmentDesign.repository.UserAddressRepository;
 import com.garmentDesign.service.ServiceOrderAttachmentService;
 import com.garmentDesign.service.ServiceOrderService;
+import com.garmentDesign.dto.serviceorder.UserCreateServiceOrderRequest;
+import com.garmentDesign.entity.User;
+import com.garmentDesign.repository.ServiceRepository;
+import com.garmentDesign.repository.UserRepository;
 
 import jakarta.transaction.Transactional;
 
@@ -32,20 +36,23 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
 	private final ServiceOrderAttachmentService attachmentService;
 	private final ServiceReviewRepository reviewRepository;
+	private final UserRepository userRepository;
+	private final ServiceRepository serviceRepository;
 
 	public ServiceOrderServiceImpl(
 	        ServiceOrderRepository repository,
 	        UserAddressRepository addressRepository,
+	        UserRepository userRepository,
+	        ServiceRepository serviceRepository,
 	        ServiceOrderAttachmentService attachmentService,
 	        ServiceReviewRepository reviewRepository
 	) {
 	    this.repository = repository;
-	    this.addressRepository =
-	        addressRepository;
-	    this.attachmentService =
-	        attachmentService;
-	    this.reviewRepository =
-	        reviewRepository;
+	    this.addressRepository = addressRepository;
+	    this.userRepository = userRepository;
+	    this.serviceRepository = serviceRepository;
+	    this.attachmentService = attachmentService;
+	    this.reviewRepository = reviewRepository;
 	}
 
     @Override
@@ -100,9 +107,9 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                     : request.getProductName().trim();
 
         String unitType =
-                request.getUnitType() == null
-                    ? ""
-                    : request.getUnitType().trim();
+        	    currentOrder.getUnitType() == null
+        	        ? ""
+        	        : currentOrder.getUnitType().trim();
 
         BigDecimal quantity = request.getQuantity();
 
@@ -367,5 +374,124 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Override
     public List<ServiceOrder>findByUserId(String idUser) {
         return repository.findVisibleOrdersByUser(idUser);
+    }
+    
+    @Override
+    @Transactional
+    public ServiceOrder createByUser(
+            String idUser,
+            UserCreateServiceOrderRequest request
+    ) {
+        if (request == null) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Dữ liệu đơn hàng không hợp lệ."
+            );
+        }
+
+        String productName =
+            request.getProductName() == null
+                ? ""
+                : request.getProductName().trim();
+
+        if (productName.isBlank()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Tên sản phẩm không được để trống."
+            );
+        }
+
+        if (
+            request.getQuantity() == null ||
+            request.getQuantity()
+                .compareTo(BigDecimal.ZERO) <= 0
+        ) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Số lượng phải lớn hơn 0."
+            );
+        }
+
+        if (request.getServiceId() == null) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Vui lòng chọn dịch vụ."
+            );
+        }
+
+        if (request.getAddressId() == null) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Vui lòng chọn địa chỉ nhận hàng."
+            );
+        }
+
+        User currentUser = userRepository
+            .findByIdUserAndDeletedAtIsNull(idUser)
+            .orElseThrow(() ->
+                new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Không tìm thấy người dùng."
+                )
+            );
+
+        var selectedService = serviceRepository
+        	    .findById(request.getServiceId())
+        	    .filter(item -> item.getDeletedAt() == null)
+        	    .filter(item ->
+        	        !"inactive".equalsIgnoreCase(
+        	            item.getStatus() == null ? "" : item.getStatus().trim()
+        	        )
+        	    )
+        	    .orElseThrow(() ->
+        	        new ResponseStatusException(
+        	            HttpStatus.NOT_FOUND,
+        	            "Dịch vụ không tồn tại hoặc đã ngừng hoạt động."
+        	        )
+        	    );
+
+        UserAddress selectedAddress = addressRepository
+            .findByAddressIdAndUser_IdUserAndDeletedAtIsNull(
+                request.getAddressId(),
+                idUser
+            )
+            .orElseThrow(() ->
+                new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Địa chỉ không tồn tại hoặc không thuộc người dùng."
+                )
+            );
+
+        BigDecimal unitPrice =
+            selectedService.getBasePrice() == null
+                ? BigDecimal.ZERO
+                : selectedService.getBasePrice();
+
+        BigDecimal discountAmount = BigDecimal.ZERO;
+
+        BigDecimal totalPrice = unitPrice
+            .multiply(request.getQuantity())
+            .subtract(discountAmount)
+            .max(BigDecimal.ZERO);
+
+        ServiceOrder order = new ServiceOrder();
+
+        order.setUser(currentUser);
+        order.setService(selectedService);
+        order.setAddress(selectedAddress);
+        order.setProductName(productName);
+        order.setCustomerRequest(
+            request.getCustomerRequest() == null
+                ? null
+                : request.getCustomerRequest().trim()
+        );
+        order.setUnitType(selectedService.getUnitType());
+        order.setQuantity(request.getQuantity());
+        order.setUnitPrice(unitPrice);
+        order.setDiscountAmount(discountAmount);
+        order.setTotalPrice(totalPrice);
+        order.setStatus("pending");
+
+        return repository.save(order);
     }
 }

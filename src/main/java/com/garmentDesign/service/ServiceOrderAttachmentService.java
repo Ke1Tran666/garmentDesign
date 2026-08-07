@@ -210,34 +210,47 @@ public class ServiceOrderAttachmentService {
     }
 
     public List<Map<String, Object>> findByOrder(
-            Long orderId
+            Long orderId,
+            String idUser
     ) {
+        ServiceOrder order = orderRepository
+            .findById(orderId)
+            .orElseThrow(() ->
+                new RuntimeException("Không tìm thấy đơn hàng.")
+            );
+
+        validateOwner(order, idUser);
+
         return fileRepository
-                .findByServiceOrder_ServiceOrderId(orderId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+            .findByServiceOrder_ServiceOrderId(orderId)
+            .stream()
+            .map(this::toResponse)
+            .toList();
     }
 
-    public DownloadFile loadFile(Long fileId) {
+    public DownloadFile loadFile(
+            Long fileId,
+            String idUser
+    ) {
         ServiceOrderFile file = fileRepository
-                .findById(fileId)
-                .orElseThrow(
-                    () -> new RuntimeException(
-                        "Không tìm thấy file."
-                    )
-                );
+            .findById(fileId)
+            .orElseThrow(() ->
+                new RuntimeException("Không tìm thấy file.")
+            );
+
+        validateOwner(
+            file.getServiceOrder(),
+            idUser
+        );
 
         Path filePath = uploadRoot
-                .resolve(file.getFilePath())
-                .normalize();
+            .resolve(file.getFilePath())
+            .normalize();
 
         validatePath(filePath);
 
         if (!Files.exists(filePath)) {
-            throw new RuntimeException(
-                "File không tồn tại trên hệ thống."
-            );
+            throw new RuntimeException("File không tồn tại trên hệ thống.");
         }
 
         return new DownloadFile(
@@ -419,11 +432,11 @@ public class ServiceOrderAttachmentService {
         response.put("serviceOrderId",file.getServiceOrder().getServiceOrderId());
 
         response.put(
-            "contentUrl",
-            "/api/service-order-files/"
-            + file.getFileId()
-            + "/content"
-        );
+        	    "contentUrl",
+        	    "/api/service-order-files/me/"
+        	    + file.getFileId()
+        	    + "/content"
+        	);
 
         return response;
     }

@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/service-reviews")
-@CrossOrigin(origins = "*")
 public class ServiceReviewController {
 
     private final ServiceReviewService service;

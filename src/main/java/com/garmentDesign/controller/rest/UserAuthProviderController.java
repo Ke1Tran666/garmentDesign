@@ -8,7 +8,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/user-auth-providers")
-@CrossOrigin(origins = "*")
 public class UserAuthProviderController {
     private final UserAuthProviderService service;
 

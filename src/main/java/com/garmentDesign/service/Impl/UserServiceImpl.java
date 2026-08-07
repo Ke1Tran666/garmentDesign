@@ -137,11 +137,54 @@ public class UserServiceImpl implements UserService {
 
         profile.put("user", user);
 
-        profile.put(
-                "authProviders",
-                authProviderRepository
-                        .findByUser_IdUserAndDeletedAtIsNull(idUser)
-        );
+        List<Map<String, Object>> safeProviders =
+        	    authProviderRepository
+        	        .findByUser_IdUserAndDeletedAtIsNull(
+        	            idUser
+        	        )
+        	        .stream()
+        	        .map(provider -> {
+        	            Map<String, Object> item =
+        	                new HashMap<>();
+
+        	            item.put(
+        	                "id",
+        	                provider.getId()
+        	            );
+
+        	            item.put(
+        	                "provider",
+        	                provider.getProvider()
+        	            );
+
+        	            item.put(
+        	                "email",
+        	                provider.getEmail()
+        	            );
+
+        	            item.put(
+        	                "phone",
+        	                provider.getPhone()
+        	            );
+
+        	            item.put(
+        	                "emailVerifiedAt",
+        	                provider.getEmailVerifiedAt()
+        	            );
+
+        	            item.put(
+        	                "phoneVerifiedAt",
+        	                provider.getPhoneVerifiedAt()
+        	            );
+
+        	            return item;
+        	        })
+        	        .toList();
+
+        	profile.put(
+        	    "authProviders",
+        	    safeProviders
+        	);
 
         profile.put(
                 "addresses",

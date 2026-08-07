@@ -1,5 +1,6 @@
 package com.garmentDesign.service;
 
+import com.garmentDesign.dto.serviceorder.UserCreateServiceOrderRequest;
 import com.garmentDesign.dto.serviceorder.UserRemoveServiceOrderResponse;
 import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
@@ -25,5 +26,10 @@ public interface ServiceOrderService {
     	    Long orderId,
     	    String idUser,
     	    UserUpdateOrderAddressRequest request
+    	);
+    
+    ServiceOrder createByUser(
+    	    String idUser,
+    	    UserCreateServiceOrderRequest request
     	);
 }

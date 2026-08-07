@@ -10,6 +10,7 @@ import com.garmentDesign.entity.UserAddress;
 import com.garmentDesign.repository.UserAddressRepository;
 import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.UserAddressService;
+import org.springframework.security.access.AccessDeniedException;
 
 @Service
 public class UserAddressServiceImpl implements UserAddressService {
@@ -23,6 +24,20 @@ public class UserAddressServiceImpl implements UserAddressService {
             this.repository = repository;
             this.userRepository = userRepository;
         }
+    
+    private UserAddress requireOwnedAddress(
+            String idUser,
+            Long addressId
+    ) {
+        return repository
+            .findByAddressIdAndUser_IdUserAndDeletedAtIsNull(
+                addressId,
+                idUser
+            )
+            .orElseThrow(() ->
+                new AccessDeniedException("Không tìm thấy địa chỉ hoặc địa chỉ không thuộc người dùng hiện tại")
+            );
+    }
 
     @Override
     public List<UserAddress> findAll() {
@@ -109,6 +124,43 @@ public class UserAddressServiceImpl implements UserAddressService {
         userRepository.save(user);
 
         return address;
+    }
+    
+    @Override
+    public UserAddress updateByUser(
+            String idUser,
+            Long addressId,
+            UserAddress data
+    ) {
+        UserAddress oldData =
+            requireOwnedAddress(
+                idUser,
+                addressId
+            );
+
+        oldData.setCompanyName(data.getCompanyName());
+
+        oldData.setAddress(data.getAddress());
+
+        oldData.setNote(data.getNote());
+
+        return repository.save(oldData);
+    }
+
+    @Override
+    public void deleteByUser(
+            String idUser,
+            Long addressId
+    ) {
+        UserAddress address =
+            requireOwnedAddress(
+                idUser,
+                addressId
+            );
+
+        address.setDeletedAt(java.time.LocalDateTime.now());
+
+        repository.save(address);
     }
 
 }
