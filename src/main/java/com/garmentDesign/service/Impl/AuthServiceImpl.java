@@ -56,6 +56,24 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("Tài khoản của bạn đã bị xóa. Nếu muốn khôi phục vui lòng liên hệ hotline để được hỗ trợ.");
         }
     }
+    
+    private Map<String, Object> createLoginResponse(User user) {
+        if (user.getRole() == null) {
+            throw new RuntimeException(
+                "Tài khoản chưa được phân quyền"
+            );
+        }
+
+        Map<String, Object> result = new HashMap<>();
+
+        result.put("token", "fake-token-demo");
+
+        result.put("idUser", user.getIdUser());
+
+        result.put("role", user.getRole().getNameRole());
+
+        return result;
+    }
 
     private String removeVietnameseAccent(String value) {
         String normalized = Normalizer.normalize(value, Normalizer.Form.NFD);
@@ -177,11 +195,7 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("Mật khẩu không đúng");
         }
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", "fake-token-demo");
-        result.put("idUser", user.getIdUser());
-
-        return result;
+        return createLoginResponse(user);
     }
 
     @Override
@@ -194,11 +208,7 @@ public class AuthServiceImpl implements AuthService {
 
         validateUserStatus(user);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", "fake-token-demo");
-        result.put("idUser", user.getIdUser());
-
-        return result;
+        return createLoginResponse(user);
     }
 
     @Override
@@ -273,12 +283,11 @@ public class AuthServiceImpl implements AuthService {
 
         otpService.clearOtp(phone, "phone");
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("message", "Xác thực số điện thoại thành công");
-        result.put("token", "fake-token-demo");
-        result.put("idUser", user.getIdUser());
+        Map<String, Object> result = createLoginResponse(user);
 
-        return result;
+    	result.put("message", "Xác thực số điện thoại thành công");
+
+    	return result;
     }
 
     @Override
@@ -564,10 +573,6 @@ public class AuthServiceImpl implements AuthService {
             authProviderRepository.save(newAuth);
         }
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", "fake-token-demo");
-        result.put("idUser", user.getIdUser());
-
-        return result;
+        return createLoginResponse(user);
     }
 }
