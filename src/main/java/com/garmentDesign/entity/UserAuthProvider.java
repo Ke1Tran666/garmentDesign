@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.GeneratedValue;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "User_Auth_Providers")
@@ -20,6 +21,9 @@ public class UserAuthProvider {
 	private String provider;
 	private String email;
 	private String phone;
+	
+	@JsonIgnore
+	@Column(name = "password", length = 255)
 	private String password;
 
 	@Column(name = "provider_id")

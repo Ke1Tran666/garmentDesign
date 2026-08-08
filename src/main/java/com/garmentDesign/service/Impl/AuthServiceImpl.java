@@ -12,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import com.garmentDesign.dto.auth.AuthenticatedUser;
@@ -23,6 +24,7 @@ import com.garmentDesign.repository.UserAuthProviderRepository;
 import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.AuthService;
 import com.garmentDesign.service.OtpService;
+import com.garmentDesign.service.PasswordService;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -31,13 +33,15 @@ public class AuthServiceImpl implements AuthService {
 	private final UserRepository userRepository;
 	private final RoleRepository roleRepository;
 	private final OtpService otpService;
+	private final PasswordService passwordService;
 
 	public AuthServiceImpl(UserAuthProviderRepository authProviderRepository, UserRepository userRepository,
-			RoleRepository roleRepository, OtpService otpService) {
+			RoleRepository roleRepository, OtpService otpService, PasswordService passwordService) {
 		this.authProviderRepository = authProviderRepository;
 		this.userRepository = userRepository;
 		this.roleRepository = roleRepository;
 		this.otpService = otpService;
+		this.passwordService = passwordService;
 	}
 
 	private void validateUserStatus(User user) {
@@ -155,27 +159,41 @@ public class AuthServiceImpl implements AuthService {
 	}
 
 	@Override
+	@Transactional
 	public AuthenticatedUser login(String email, String password) {
-		if (email == null || email.isBlank()) {
-			throw new RuntimeException("Email không được để trống");
-		}
+	    if (email == null || email.isBlank()) {
+	        throw new RuntimeException("Email không được để trống");
+	    }
 
-		if (password == null || password.isBlank()) {
-			throw new RuntimeException("Mật khẩu không được để trống");
-		}
+	    if (password == null || password.isBlank()) {
+	        throw new RuntimeException("Mật khẩu không được để trống");
+	    }
 
-		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(email.trim(), "local")
-				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+	    UserAuthProvider auth = authProviderRepository
+	        .findByEmailAndProvider(email.trim(), "local")
+	        .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
 
-		User user = auth.getUser();
+	    User user = auth.getUser();
 
-		validateUserStatus(user);
+	    validateUserStatus(user);
 
-		if (!auth.getPassword().equals(password)) {
-			throw new RuntimeException("Mật khẩu không đúng");
-		}
+	    String storedPassword = auth.getPassword();
 
-		return createLoginResult(user);
+	    if (!passwordService.matches(password, storedPassword)) {
+	        throw new RuntimeException("Mật khẩu không đúng");
+	    }
+
+	    /*
+	     * Nếu tài khoản cũ còn lưu plaintext thì nâng cấp sang BCrypt
+	     * ngay sau lần đăng nhập thành công.
+	     */
+	    if (passwordService.needsUpgrade(storedPassword)) {
+	        auth.setPassword(passwordService.encode(password));
+	        auth.setUpdatedAt(LocalDateTime.now());
+	        authProviderRepository.save(auth);
+	    }
+
+	    return createLoginResult(user);
 	}
 
 	@Override
@@ -301,6 +319,7 @@ public class AuthServiceImpl implements AuthService {
 	@Override
 	public Map<String, Object> register(String email, String password, String fullName, String gender,
 			String birthday) {
+		passwordService.validateNewPassword(password);
 		UserAuthProvider existingAuth = authProviderRepository.findByEmailAndProvider(email, "local").orElse(null);
 
 		if (existingAuth != null) {
@@ -361,7 +380,7 @@ public class AuthServiceImpl implements AuthService {
 		auth.setProvider("local");
 		auth.setEmail(email);
 		auth.setEmailVerifiedAt(null);
-		auth.setPassword(password);
+		auth.setPassword(passwordService.encode(password));
 
 		authProviderRepository.save(auth);
 
@@ -409,23 +428,34 @@ public class AuthServiceImpl implements AuthService {
 	}
 
 	@Override
-	public Map<String, Object> resetPassword(String email, String newPassword) {
-		if (!otpService.isVerified(email, "email")) {
-			throw new RuntimeException("Bạn chưa xác thực OTP hoặc phiên đã hết hạn");
-		}
+	@Transactional
+	public Map<String, Object> resetPassword(
+	        String email,
+	        String newPassword) {
 
-		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(email, "local")
-				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+	    passwordService.validateNewPassword(newPassword);
 
-		auth.setPassword(newPassword);
-		authProviderRepository.save(auth);
+	    if (!otpService.isVerified(email, "email")) {
+	        throw new RuntimeException(
+	            "Bạn chưa xác thực OTP hoặc phiên đã hết hạn"
+	        );
+	    }
 
-		otpService.clearVerified(email, "email");
+	    UserAuthProvider auth = authProviderRepository
+	        .findByEmailAndProvider(email, "local")
+	        .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("message", "Đổi mật khẩu thành công");
+	    auth.setPassword(passwordService.encode(newPassword));
+	    auth.setUpdatedAt(LocalDateTime.now());
 
-		return result;
+	    authProviderRepository.save(auth);
+
+	    otpService.clearVerified(email, "email");
+
+	    Map<String, Object> result = new HashMap<>();
+	    result.put("message", "Đổi mật khẩu thành công");
+
+	    return result;
 	}
 
 	@Override
