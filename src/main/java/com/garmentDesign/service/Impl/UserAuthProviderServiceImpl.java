@@ -29,23 +29,17 @@ public class UserAuthProviderServiceImpl implements UserAuthProviderService {
 
 	@Override
 	public UserAuthProvider save(UserAuthProvider data) {
-	    if (data.getPassword() != null) {
-	        throw new RuntimeException(
-	            "Không được thiết lập mật khẩu qua API quản trị"
-	        );
-	    }
+		if (data.getPassword() != null) {
+			throw new RuntimeException("Không được thiết lập mật khẩu qua API quản trị");
+		}
 
-	    return repository.save(data);
+		return repository.save(data);
 	}
 
 	@Override
 	public UserAuthProvider update(Long id, UserAuthProvider data) {
 		UserAuthProvider oldData = findById(id);
-		BeanUtils.copyProperties(
-			    data,
-			    oldData,
-			    "id",
-			    "password","createdAt","updatedAt");
+		BeanUtils.copyProperties(data, oldData, "id", "password", "createdAt", "updatedAt");
 		return repository.save(oldData);
 	}
 

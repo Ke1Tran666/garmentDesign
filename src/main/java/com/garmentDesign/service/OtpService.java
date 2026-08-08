@@ -2,7 +2,7 @@ package com.garmentDesign.service;
 
 public interface OtpService {
 
-	String sendOtp(String target, String type);
+	void sendOtp(String target, String type);
 
 	boolean verifyOtp(String target, String type, String otp);
 

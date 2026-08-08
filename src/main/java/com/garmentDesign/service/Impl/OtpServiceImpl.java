@@ -1,43 +1,93 @@
 package com.garmentDesign.service.Impl;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.garmentDesign.service.MailService;
 import com.garmentDesign.service.OtpService;
 
 @Service
 public class OtpServiceImpl implements OtpService {
 
-	private final Map<String, OtpData> otpStorage = new HashMap<>();
-	private final Map<String, LocalDateTime> verifiedStorage = new HashMap<>();
+	private static final Logger LOGGER = LoggerFactory.getLogger(OtpServiceImpl.class);
 
-	private String buildKey(String target, String type) {
-		return type + ":" + target;
+	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+	private static final int OTP_EXPIRY_MINUTES = 5;
+	private static final int VERIFIED_EXPIRY_MINUTES = 10;
+	private static final int RESEND_SECONDS = 60;
+	private static final int MAX_FAILED_ATTEMPTS = 5;
+
+	private final Map<String, OtpData> otpStorage = new ConcurrentHashMap<>();
+
+	private final Map<String, LocalDateTime> verifiedStorage = new ConcurrentHashMap<>();
+
+	private final MailService mailService;
+	private final PasswordEncoder passwordEncoder;
+	private final boolean phoneConsoleEnabled;
+
+	public OtpServiceImpl(MailService mailService, PasswordEncoder passwordEncoder,
+			@Value("${app.otp.phone-console-enabled:false}") boolean phoneConsoleEnabled) {
+
+		this.mailService = mailService;
+		this.passwordEncoder = passwordEncoder;
+		this.phoneConsoleEnabled = phoneConsoleEnabled;
 	}
 
 	@Override
-	public String sendOtp(String target, String type) {
-		String otp = String.format("%06d", new Random().nextInt(1000000));
+	public void sendOtp(String target, String type) {
+		String normalizedTarget = normalizeTarget(target, type);
 
-		String key = buildKey(target, type);
+		String key = buildKey(normalizedTarget, type);
 
-		otpStorage.put(key, new OtpData(otp, LocalDateTime.now().plusMinutes(5)));
+		LocalDateTime now = LocalDateTime.now();
+
+		OtpData existingOtp = otpStorage.get(key);
+
+		if (existingOtp != null && existingOtp.getResendAvailableAt().isAfter(now)) {
+
+			throw new RuntimeException("Vui lòng chờ 60 giây trước khi gửi lại OTP");
+		}
+
+		String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+
+		String encodedOtp = passwordEncoder.encode(otp);
 
 		/*
-		 * Sau này xử lý ở đây: type = phone -> gửi SMS type = email -> gửi mail
+		 * Chỉ lưu OTP sau khi kênh gửi xử lý thành công.
 		 */
-		System.out.println("OTP " + type + " của " + target + ": " + otp);
+		if (isEmailOtp(type)) {
+			mailService.sendOtpEmail(normalizedTarget, otp, type);
+		} else if ("phone".equals(type)) {
+			sendPhoneOtpForLocalDevelopment(normalizedTarget, otp);
+		} else {
+			throw new RuntimeException("Loại OTP không được hỗ trợ");
+		}
 
-		return otp;
+		otpStorage.put(key,
+				new OtpData(encodedOtp, now.plusMinutes(OTP_EXPIRY_MINUTES), now.plusSeconds(RESEND_SECONDS)));
 	}
 
 	@Override
 	public boolean verifyOtp(String target, String type, String otp) {
-		String key = buildKey(target, type);
+
+		if (otp == null || otp.isBlank()) {
+			throw new RuntimeException("OTP không được để trống");
+		}
+
+		String normalizedTarget = normalizeTarget(target, type);
+
+		String key = buildKey(normalizedTarget, type);
 
 		OtpData otpData = otpStorage.get(key);
 
@@ -46,11 +96,23 @@ public class OtpServiceImpl implements OtpService {
 		}
 
 		if (otpData.getExpiresAt().isBefore(LocalDateTime.now())) {
-			otpStorage.remove(key);
+
+			otpStorage.remove(key, otpData);
+
 			throw new RuntimeException("OTP đã hết hạn");
 		}
 
-		if (!otpData.getOtp().equals(otp)) {
+		boolean correct = passwordEncoder.matches(otp.trim(), otpData.getEncodedOtp());
+
+		if (!correct) {
+			boolean attemptsExhausted = otpData.recordFailedAttempt();
+
+			if (attemptsExhausted) {
+				otpStorage.remove(key, otpData);
+
+				throw new RuntimeException("Bạn đã nhập sai OTP quá 5 lần. " + "Vui lòng yêu cầu mã mới");
+			}
+
 			throw new RuntimeException("OTP không chính xác");
 		}
 
@@ -59,13 +121,20 @@ public class OtpServiceImpl implements OtpService {
 
 	@Override
 	public void markVerified(String target, String type) {
-		String key = buildKey(target, type);
-		verifiedStorage.put(key, LocalDateTime.now().plusMinutes(10));
+
+		String normalizedTarget = normalizeTarget(target, type);
+
+		String key = buildKey(normalizedTarget, type);
+
+		verifiedStorage.put(key, LocalDateTime.now().plusMinutes(VERIFIED_EXPIRY_MINUTES));
 	}
 
 	@Override
 	public boolean isVerified(String target, String type) {
-		String key = buildKey(target, type);
+
+		String normalizedTarget = normalizeTarget(target, type);
+
+		String key = buildKey(normalizedTarget, type);
 
 		LocalDateTime expiresAt = verifiedStorage.get(key);
 
@@ -74,7 +143,7 @@ public class OtpServiceImpl implements OtpService {
 		}
 
 		if (expiresAt.isBefore(LocalDateTime.now())) {
-			verifiedStorage.remove(key);
+			verifiedStorage.remove(key, expiresAt);
 			return false;
 		}
 
@@ -83,29 +152,86 @@ public class OtpServiceImpl implements OtpService {
 
 	@Override
 	public void clearOtp(String target, String type) {
-		otpStorage.remove(buildKey(target, type));
+
+		String normalizedTarget = normalizeTarget(target, type);
+
+		otpStorage.remove(buildKey(normalizedTarget, type));
 	}
 
 	@Override
 	public void clearVerified(String target, String type) {
-		verifiedStorage.remove(buildKey(target, type));
+
+		String normalizedTarget = normalizeTarget(target, type);
+
+		verifiedStorage.remove(buildKey(normalizedTarget, type));
+	}
+
+	private String buildKey(String normalizedTarget, String type) {
+
+		return type + ":" + normalizedTarget;
+	}
+
+	private String normalizeTarget(String target, String type) {
+
+		if (target == null || target.isBlank()) {
+			throw new RuntimeException("Thông tin nhận OTP không hợp lệ");
+		}
+
+		String normalized = target.trim();
+
+		if (isEmailOtp(type)) {
+			normalized = normalized.toLowerCase(Locale.ROOT);
+		}
+
+		return normalized;
+	}
+
+	private boolean isEmailOtp(String type) {
+		return "verify-email".equals(type) || "reset-password".equals(type);
+	}
+
+	private void sendPhoneOtpForLocalDevelopment(String phone, String otp) {
+
+		if (!phoneConsoleEnabled) {
+			throw new RuntimeException("Kênh gửi OTP điện thoại chưa được cấu hình");
+		}
+
+		/*
+		 * Chỉ dùng khi chạy local. Production phải đặt phone-console-enabled=false.
+		 */
+		LOGGER.warn("LOCAL PHONE OTP - phone: {}, otp: {}", phone, otp);
 	}
 
 	private static class OtpData {
-		private final String otp;
+
+		private final String encodedOtp;
 		private final LocalDateTime expiresAt;
+		private final LocalDateTime resendAvailableAt;
 
-		public OtpData(String otp, LocalDateTime expiresAt) {
-			this.otp = otp;
+		private int failedAttempts;
+
+		OtpData(String encodedOtp, LocalDateTime expiresAt, LocalDateTime resendAvailableAt) {
+
+			this.encodedOtp = encodedOtp;
 			this.expiresAt = expiresAt;
+			this.resendAvailableAt = resendAvailableAt;
 		}
 
-		public String getOtp() {
-			return otp;
+		String getEncodedOtp() {
+			return encodedOtp;
 		}
 
-		public LocalDateTime getExpiresAt() {
+		LocalDateTime getExpiresAt() {
 			return expiresAt;
+		}
+
+		LocalDateTime getResendAvailableAt() {
+			return resendAvailableAt;
+		}
+
+		synchronized boolean recordFailedAttempt() {
+			failedAttempts++;
+			return failedAttempts >= MAX_FAILED_ATTEMPTS;
 		}
 	}
 }

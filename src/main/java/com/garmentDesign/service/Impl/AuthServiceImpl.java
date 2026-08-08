@@ -26,6 +26,8 @@ import com.garmentDesign.service.AuthService;
 import com.garmentDesign.service.OtpService;
 import com.garmentDesign.service.PasswordService;
 
+import java.util.Locale;
+
 @Service
 public class AuthServiceImpl implements AuthService {
 
@@ -35,6 +37,9 @@ public class AuthServiceImpl implements AuthService {
 	private final OtpService otpService;
 	private final PasswordService passwordService;
 
+	private static final String VERIFY_EMAIL_OTP = "verify-email";
+	private static final String RESET_PASSWORD_OTP = "reset-password";
+
 	public AuthServiceImpl(UserAuthProviderRepository authProviderRepository, UserRepository userRepository,
 			RoleRepository roleRepository, OtpService otpService, PasswordService passwordService) {
 		this.authProviderRepository = authProviderRepository;
@@ -42,6 +47,14 @@ public class AuthServiceImpl implements AuthService {
 		this.roleRepository = roleRepository;
 		this.otpService = otpService;
 		this.passwordService = passwordService;
+	}
+
+	private String normalizeEmail(String email) {
+		if (email == null || email.isBlank()) {
+			throw new RuntimeException("Email không được để trống");
+		}
+
+		return email.trim().toLowerCase(Locale.ROOT);
 	}
 
 	private void validateUserStatus(User user) {
@@ -161,39 +174,36 @@ public class AuthServiceImpl implements AuthService {
 	@Override
 	@Transactional
 	public AuthenticatedUser login(String email, String password) {
-	    if (email == null || email.isBlank()) {
-	        throw new RuntimeException("Email không được để trống");
-	    }
 
-	    if (password == null || password.isBlank()) {
-	        throw new RuntimeException("Mật khẩu không được để trống");
-	    }
+		String normalizedEmail = normalizeEmail(email);
 
-	    UserAuthProvider auth = authProviderRepository
-	        .findByEmailAndProvider(email.trim(), "local")
-	        .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+		if (password == null || password.isBlank()) {
+			throw new RuntimeException("Mật khẩu không được để trống");
+		}
 
-	    User user = auth.getUser();
+		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
+				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
 
-	    validateUserStatus(user);
+		User user = auth.getUser();
 
-	    String storedPassword = auth.getPassword();
+		validateUserStatus(user);
 
-	    if (!passwordService.matches(password, storedPassword)) {
-	        throw new RuntimeException("Mật khẩu không đúng");
-	    }
+		String storedPassword = auth.getPassword();
 
-	    /*
-	     * Nếu tài khoản cũ còn lưu plaintext thì nâng cấp sang BCrypt
-	     * ngay sau lần đăng nhập thành công.
-	     */
-	    if (passwordService.needsUpgrade(storedPassword)) {
-	        auth.setPassword(passwordService.encode(password));
-	        auth.setUpdatedAt(LocalDateTime.now());
-	        authProviderRepository.save(auth);
-	    }
+		if (!passwordService.matches(password, storedPassword)) {
 
-	    return createLoginResult(user);
+			throw new RuntimeException("Mật khẩu không đúng");
+		}
+
+		if (passwordService.needsUpgrade(storedPassword)) {
+			auth.setPassword(passwordService.encode(password));
+
+			auth.setUpdatedAt(LocalDateTime.now());
+
+			authProviderRepository.save(auth);
+		}
+
+		return createLoginResult(user);
 	}
 
 	@Override
@@ -270,34 +280,30 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	public Map<String, Object> sendEmailOtp(String email) {
-		if (email == null || email.trim().isEmpty()) {
-			throw new RuntimeException("Email không được để trống");
-		}
+		String normalizedEmail = normalizeEmail(email);
 
-		authProviderRepository.findByEmailAndProvider(email, "local")
+		authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
 				.orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản local với email này"));
 
-		otpService.sendOtp(email, "email");
+		otpService.sendOtp(normalizedEmail, VERIFY_EMAIL_OTP);
 
 		return Map.of("message", "Đã gửi OTP xác thực email");
 	}
 
 	@Override
+	@Transactional
 	public Map<String, Object> verifyEmailOtp(String email, String otp) {
-		if (email == null || email.isBlank()) {
-			throw new RuntimeException("Email không được để trống");
-		}
+
+		String normalizedEmail = normalizeEmail(email);
 
 		if (otp == null || otp.isBlank()) {
 			throw new RuntimeException("OTP không được để trống");
 		}
 
-		String normalizedEmail = email.trim().toLowerCase();
-
 		UserAuthProvider provider = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
 				.orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản local"));
 
-		otpService.verifyOtp(normalizedEmail, "email", otp.trim());
+		otpService.verifyOtp(normalizedEmail, VERIFY_EMAIL_OTP, otp.trim());
 
 		User user = provider.getUser();
 
@@ -311,16 +317,22 @@ public class AuthServiceImpl implements AuthService {
 
 		updateUserStatus(user);
 
-		otpService.clearOtp(normalizedEmail, "email");
+		otpService.clearOtp(normalizedEmail, VERIFY_EMAIL_OTP);
 
 		return Map.of("message", "Xác thực email thành công");
 	}
 
 	@Override
+	@Transactional
 	public Map<String, Object> register(String email, String password, String fullName, String gender,
 			String birthday) {
+
+		String normalizedEmail = normalizeEmail(email);
+
 		passwordService.validateNewPassword(password);
-		UserAuthProvider existingAuth = authProviderRepository.findByEmailAndProvider(email, "local").orElse(null);
+
+		UserAuthProvider existingAuth = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
+				.orElse(null);
 
 		if (existingAuth != null) {
 			User existingUser = existingAuth.getUser();
@@ -378,7 +390,7 @@ public class AuthServiceImpl implements AuthService {
 		UserAuthProvider auth = new UserAuthProvider();
 		auth.setUser(user);
 		auth.setProvider("local");
-		auth.setEmail(email);
+		auth.setEmail(normalizedEmail);
 		auth.setEmailVerifiedAt(null);
 		auth.setPassword(passwordService.encode(password));
 
@@ -392,7 +404,10 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	public Map<String, Object> forgotPassword(String email) {
-		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(email, "local")
+
+		String normalizedEmail = normalizeEmail(email);
+
+		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
 				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
 
 		User user = auth.getUser();
@@ -400,62 +415,61 @@ public class AuthServiceImpl implements AuthService {
 		validateUserStatus(user);
 
 		if ("pending".equalsIgnoreCase(user.getStatus())) {
-			throw new RuntimeException(
-					"Tài khoản của bạn chưa hoàn tất đăng ký. Vui lòng liên hệ hotline để được hỗ trợ.");
+
+			throw new RuntimeException("Tài khoản chưa hoàn tất đăng ký. " + "Vui lòng xác thực email trước.");
 		}
 
-		otpService.sendOtp(email, "email");
+		otpService.sendOtp(normalizedEmail, RESET_PASSWORD_OTP);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("message", "Đã gửi OTP về email");
-
-		return result;
+		return Map.of("message", "Đã gửi OTP về email");
 	}
 
 	@Override
 	public Map<String, Object> verifyForgotOtp(String email, String otp) {
-		authProviderRepository.findByEmailAndProvider(email, "local")
+
+		String normalizedEmail = normalizeEmail(email);
+
+		if (otp == null || otp.isBlank()) {
+			throw new RuntimeException("OTP không được để trống");
+		}
+
+		authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
 				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
 
-		otpService.verifyOtp(email, "email", otp);
-		otpService.markVerified(email, "email");
-		otpService.clearOtp(email, "email");
+		otpService.verifyOtp(normalizedEmail, RESET_PASSWORD_OTP, otp.trim());
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("message", "Xác thực OTP thành công");
+		otpService.markVerified(normalizedEmail, RESET_PASSWORD_OTP);
 
-		return result;
+		otpService.clearOtp(normalizedEmail, RESET_PASSWORD_OTP);
+
+		return Map.of("message", "Xác thực OTP thành công");
 	}
 
 	@Override
 	@Transactional
-	public Map<String, Object> resetPassword(
-	        String email,
-	        String newPassword) {
+	public Map<String, Object> resetPassword(String email, String newPassword) {
 
-	    passwordService.validateNewPassword(newPassword);
+		String normalizedEmail = normalizeEmail(email);
 
-	    if (!otpService.isVerified(email, "email")) {
-	        throw new RuntimeException(
-	            "Bạn chưa xác thực OTP hoặc phiên đã hết hạn"
-	        );
-	    }
+		passwordService.validateNewPassword(newPassword);
 
-	    UserAuthProvider auth = authProviderRepository
-	        .findByEmailAndProvider(email, "local")
-	        .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+		if (!otpService.isVerified(normalizedEmail, RESET_PASSWORD_OTP)) {
 
-	    auth.setPassword(passwordService.encode(newPassword));
-	    auth.setUpdatedAt(LocalDateTime.now());
+			throw new RuntimeException("Bạn chưa xác thực OTP hoặc phiên đã hết hạn");
+		}
 
-	    authProviderRepository.save(auth);
+		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
+				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
 
-	    otpService.clearVerified(email, "email");
+		auth.setPassword(passwordService.encode(newPassword));
 
-	    Map<String, Object> result = new HashMap<>();
-	    result.put("message", "Đổi mật khẩu thành công");
+		auth.setUpdatedAt(LocalDateTime.now());
 
-	    return result;
+		authProviderRepository.save(auth);
+
+		otpService.clearVerified(normalizedEmail, RESET_PASSWORD_OTP);
+
+		return Map.of("message", "Đổi mật khẩu thành công");
 	}
 
 	@Override

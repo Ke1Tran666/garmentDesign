@@ -21,7 +21,7 @@ public class UserAuthProvider {
 	private String provider;
 	private String email;
 	private String phone;
-	
+
 	@JsonIgnore
 	@Column(name = "password", length = 255)
 	private String password;

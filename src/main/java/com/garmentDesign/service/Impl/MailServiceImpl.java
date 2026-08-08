@@ -1,7 +1,7 @@
 package com.garmentDesign.service.Impl;
 
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import com.garmentDesign.dto.mail.ContactRequest;
@@ -9,7 +9,6 @@ import com.garmentDesign.service.MailService;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import org.springframework.mail.javamail.MimeMessageHelper;
 
 @Service
 public class MailServiceImpl implements MailService {
@@ -276,5 +275,131 @@ public class MailServiceImpl implements MailService {
 		}
 
 		return value.trim();
+	}
+
+	@Override
+	public void sendOtpEmail(String email, String otp, String purpose) {
+
+		try {
+			MimeMessage mimeMessage = mailSender.createMimeMessage();
+
+			MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, "UTF-8");
+
+			helper.setTo(email);
+
+			boolean resetPassword = "reset-password".equals(purpose);
+
+			String title = resetPassword ? "Đặt lại mật khẩu" : "Xác thực địa chỉ email";
+
+			helper.setSubject(title + " - HoaTran maymac");
+
+			String htmlContent = """
+					<!DOCTYPE html>
+					<html lang="vi">
+					<body style="
+					    margin:0;
+					    padding:0;
+					    background:#f4f7fb;
+					    font-family:Arial,sans-serif;
+					    color:#111827;
+					">
+					    <div style="
+					        max-width:600px;
+					        margin:0 auto;
+					        padding:32px 16px;
+					    ">
+					        <div style="
+					            background:#ffffff;
+					            border:1px solid #e5e7eb;
+					            border-radius:16px;
+					            overflow:hidden;
+					            box-shadow:0 10px 30px rgba(15,23,42,0.08);
+					        ">
+					            <div style="
+					                background:#0192F5;
+					                color:#ffffff;
+					                padding:28px;
+					                text-align:center;
+					            ">
+					                <div style="
+					                    font-size:13px;
+					                    letter-spacing:2px;
+					                    text-transform:uppercase;
+					                    margin-bottom:10px;
+					                ">
+					                    HoaTran maymac
+					                </div>
+
+					                <h1 style="
+					                    margin:0;
+					                    font-size:24px;
+					                ">
+					                    %s
+					                </h1>
+					            </div>
+
+					            <div style="
+					                padding:36px 28px;
+					                text-align:center;
+					            ">
+					                <p style="
+					                    color:#4b5563;
+					                    line-height:1.7;
+					                ">
+					                    Mã OTP của bạn là:
+					                </p>
+
+					                <div style="
+					                    margin:24px auto;
+					                    padding:18px 24px;
+					                    background:#eff6ff;
+					                    color:#0192F5;
+					                    border-radius:12px;
+					                    font-size:32px;
+					                    font-weight:700;
+					                    letter-spacing:8px;
+					                ">
+					                    %s
+					                </div>
+
+					                <p style="
+					                    color:#6b7280;
+					                    line-height:1.7;
+					                ">
+					                    Mã có hiệu lực trong 5 phút.<br>
+					                    Bạn có tối đa 5 lần nhập sai.
+					                </p>
+
+					                <p style="
+					                    color:#dc2626;
+					                    font-size:14px;
+					                    font-weight:600;
+					                ">
+					                    Không cung cấp mã này cho bất kỳ ai.
+					                </p>
+
+					                <p style="
+					                    margin-top:28px;
+					                    color:#9ca3af;
+					                    font-size:13px;
+					                    line-height:1.6;
+					                ">
+					                    Nếu bạn không thực hiện yêu cầu này,
+					                    hãy bỏ qua email.
+					                </p>
+					            </div>
+					        </div>
+					    </div>
+					</body>
+					</html>
+					""".formatted(title, otp);
+
+			helper.setText(htmlContent, true);
+
+			mailSender.send(mimeMessage);
+
+		} catch (Exception exception) {
+			throw new RuntimeException("Không thể gửi mã OTP qua email", exception);
+		}
 	}
 }

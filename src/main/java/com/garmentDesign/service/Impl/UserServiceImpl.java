@@ -294,64 +294,46 @@ public class UserServiceImpl implements UserService {
 	// Change Password
 	@Override
 	@Transactional
-	public Map<String, Object> changePassword(
-	        String idUser,
-	        String oldPassword,
-	        String newPassword) {
+	public Map<String, Object> changePassword(String idUser, String oldPassword, String newPassword) {
 
-	    if (idUser == null || idUser.isBlank()) {
-	        throw new RuntimeException("Không tìm thấy người dùng");
-	    }
+		if (idUser == null || idUser.isBlank()) {
+			throw new RuntimeException("Không tìm thấy người dùng");
+		}
 
-	    if (oldPassword == null || oldPassword.isBlank()) {
-	        throw new RuntimeException(
-	            "Vui lòng nhập mật khẩu hiện tại"
-	        );
-	    }
+		if (oldPassword == null || oldPassword.isBlank()) {
+			throw new RuntimeException("Vui lòng nhập mật khẩu hiện tại");
+		}
 
-	    passwordService.validateNewPassword(newPassword);
+		passwordService.validateNewPassword(newPassword);
 
-	    if (oldPassword.equals(newPassword)) {
-	        throw new RuntimeException(
-	            "Mật khẩu mới phải khác mật khẩu hiện tại"
-	        );
-	    }
+		if (oldPassword.equals(newPassword)) {
+			throw new RuntimeException("Mật khẩu mới phải khác mật khẩu hiện tại");
+		}
 
-	    UserAuthProvider localProvider = authProviderRepository
-	        .findByUser_IdUserAndProviderAndDeletedAtIsNull(
-	            idUser,
-	            "local"
-	        )
-	        .orElseThrow(() -> new RuntimeException(
-	            "Tài khoản của bạn chưa liên kết đăng nhập bằng mật khẩu."
-	        ));
+		UserAuthProvider localProvider = authProviderRepository
+				.findByUser_IdUserAndProviderAndDeletedAtIsNull(idUser, "local")
+				.orElseThrow(() -> new RuntimeException("Tài khoản của bạn chưa liên kết đăng nhập bằng mật khẩu."));
 
-	    String storedPassword = localProvider.getPassword();
+		String storedPassword = localProvider.getPassword();
 
-	    if (storedPassword == null || storedPassword.isBlank()) {
-	        throw new RuntimeException(
-	            "Tài khoản local chưa có mật khẩu."
-	        );
-	    }
+		if (storedPassword == null || storedPassword.isBlank()) {
+			throw new RuntimeException("Tài khoản local chưa có mật khẩu.");
+		}
 
-	    /*
-	     * PasswordService kiểm tra được cả BCrypt và plaintext cũ.
-	     */
-	    if (!passwordService.matches(oldPassword, storedPassword)) {
-	        throw new RuntimeException(
-	            "Mật khẩu hiện tại không đúng"
-	        );
-	    }
+		/*
+		 * PasswordService kiểm tra được cả BCrypt và plaintext cũ.
+		 */
+		if (!passwordService.matches(oldPassword, storedPassword)) {
+			throw new RuntimeException("Mật khẩu hiện tại không đúng");
+		}
 
-	    localProvider.setPassword(
-	        passwordService.encode(newPassword)
-	    );
+		localProvider.setPassword(passwordService.encode(newPassword));
 
-	    localProvider.setUpdatedAt(LocalDateTime.now());
+		localProvider.setUpdatedAt(LocalDateTime.now());
 
-	    authProviderRepository.save(localProvider);
+		authProviderRepository.save(localProvider);
 
-	    return Map.of("message", "Đổi mật khẩu thành công");
+		return Map.of("message", "Đổi mật khẩu thành công");
 	}
 
 	@Override
