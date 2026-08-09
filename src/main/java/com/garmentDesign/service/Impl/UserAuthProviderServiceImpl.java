@@ -11,57 +11,59 @@ import com.garmentDesign.service.UserAuthProviderService;
 
 @Service
 public class UserAuthProviderServiceImpl implements UserAuthProviderService {
-    private final UserAuthProviderRepository repository;
+	private final UserAuthProviderRepository repository;
 
-    public UserAuthProviderServiceImpl(UserAuthProviderRepository repository) {
-        this.repository = repository;
-    }
+	public UserAuthProviderServiceImpl(UserAuthProviderRepository repository) {
+		this.repository = repository;
+	}
 
-    @Override
-    public List<UserAuthProvider> findAll() {
-        return repository.findAll();
-    }
+	@Override
+	public List<UserAuthProvider> findAll() {
+		return repository.findAll();
+	}
 
-    @Override
-    public UserAuthProvider findById(Long id) {
-        return repository.findById(id).orElseThrow(() -> new RuntimeException("Không tìm thấy dữ liệu với id: " + id));
-    }
+	@Override
+	public UserAuthProvider findById(Long id) {
+		return repository.findById(id).orElseThrow(() -> new RuntimeException("Không tìm thấy dữ liệu với id: " + id));
+	}
 
-    @Override
-    public UserAuthProvider save(UserAuthProvider data) {
-        return repository.save(data);
-    }
+	@Override
+	public UserAuthProvider save(UserAuthProvider data) {
+		if (data.getPassword() != null) {
+			throw new RuntimeException("Không được thiết lập mật khẩu qua API quản trị");
+		}
 
-    @Override
-    public UserAuthProvider update(Long id, UserAuthProvider data) {
-        UserAuthProvider oldData = findById(id);
-        BeanUtils.copyProperties(data, oldData);
-        return repository.save(oldData);
-    }
+		return repository.save(data);
+	}
 
-    @Override
-    public void delete(Long id) {
-        UserAuthProvider provider = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy liên kết với id: " + id));
-        
-        // Không cho gỡ Google
-        if ("google".equalsIgnoreCase(provider.getProvider())) {
-            throw new RuntimeException(
-                    "Không thể gỡ liên kết tài khoản Google."
-            );
-        }
+	@Override
+	public UserAuthProvider update(Long id, UserAuthProvider data) {
+		UserAuthProvider oldData = findById(id);
+		BeanUtils.copyProperties(data, oldData, "id", "password", "createdAt", "updatedAt");
+		return repository.save(oldData);
+	}
 
-        String idUser = provider.getUser().getIdUser();
+	@Override
+	public void delete(Long id) {
+		UserAuthProvider provider = repository.findById(id)
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy liên kết với id: " + id));
 
-        long totalProviders = repository.countByUser_IdUserAndDeletedAtIsNull(idUser);
+		// Không cho gỡ Google
+		if ("google".equalsIgnoreCase(provider.getProvider())) {
+			throw new RuntimeException("Không thể gỡ liên kết tài khoản Google.");
+		}
 
-        if (totalProviders <= 1) {
-            throw new RuntimeException("Tài khoản phải có ít nhất 1 phương thức đăng nhập.");
-        }
+		String idUser = provider.getUser().getIdUser();
 
-        provider.setDeletedAt(java.time.LocalDateTime.now());
-        provider.setUpdatedAt(java.time.LocalDateTime.now());
+		long totalProviders = repository.countByUser_IdUserAndDeletedAtIsNull(idUser);
 
-        repository.save(provider);
-    }
+		if (totalProviders <= 1) {
+			throw new RuntimeException("Tài khoản phải có ít nhất 1 phương thức đăng nhập.");
+		}
+
+		provider.setDeletedAt(java.time.LocalDateTime.now());
+		provider.setUpdatedAt(java.time.LocalDateTime.now());
+
+		repository.save(provider);
+	}
 }

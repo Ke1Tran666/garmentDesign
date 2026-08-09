@@ -2,12 +2,29 @@ package com.garmentDesign.dto.serviceorder;
 
 import java.math.BigDecimal;
 
-public class UserUpdateServiceOrderRequest {
+public class UserCreateServiceOrderRequest {
 
+	private Long serviceId;
+	private Long addressId;
 	private String productName;
 	private String customerRequest;
-	private String unitType;
 	private BigDecimal quantity;
+
+	public Long getServiceId() {
+		return serviceId;
+	}
+
+	public void setServiceId(Long serviceId) {
+		this.serviceId = serviceId;
+	}
+
+	public Long getAddressId() {
+		return addressId;
+	}
+
+	public void setAddressId(Long addressId) {
+		this.addressId = addressId;
+	}
 
 	public String getProductName() {
 		return productName;
@@ -23,14 +40,6 @@ public class UserUpdateServiceOrderRequest {
 
 	public void setCustomerRequest(String customerRequest) {
 		this.customerRequest = customerRequest;
-	}
-
-	public String getUnitType() {
-		return unitType;
-	}
-
-	public void setUnitType(String unitType) {
-		this.unitType = unitType;
 	}
 
 	public BigDecimal getQuantity() {

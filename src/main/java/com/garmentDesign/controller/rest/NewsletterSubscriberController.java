@@ -15,28 +15,19 @@ import com.garmentDesign.service.NewsletterSubscriberService;
 public class NewsletterSubscriberController {
 	private final NewsletterSubscriberService service;
 
-    public NewsletterSubscriberController(
-    		NewsletterSubscriberService service
-    ) {
-        this.service = service;
-    }
+	public NewsletterSubscriberController(NewsletterSubscriberService service) {
+		this.service = service;
+	}
 
-    @PostMapping("/subscribe")
-    public ResponseEntity<?> subscribe(
-            @RequestBody Map<String, String> request
-    ) {
-        try {
-            Map<String, Object> response = service.subscribe(
-                    request.get("email")
-            );
+	@PostMapping("/subscribe")
+	public ResponseEntity<?> subscribe(@RequestBody Map<String, String> request) {
+		try {
+			Map<String, Object> response = service.subscribe(request.get("email"));
 
-            return ResponseEntity.ok(response);
+			return ResponseEntity.ok(response);
 
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", e.getMessage()
-            ));
-        }
-    }
+		} catch (RuntimeException e) {
+			return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+		}
+	}
 }

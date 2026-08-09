@@ -2,32 +2,27 @@ package com.garmentDesign.service;
 
 import java.util.Map;
 
+import com.garmentDesign.dto.auth.AuthenticatedUser;
+
 public interface AuthService {
-    Map<String, Object> login(String email, String password);
 
-    Map<String, Object> loginPhone(String phone);
+	AuthenticatedUser login(String email, String password);
 
-    Map<String, Object> sendOtp(String phone);
+	Map<String, Object> sendOtp(String phone);
 
-    Map<String, Object> verifyOtp(String idUser, String phone, String otp,String mode);
-    
-    Map<String, Object> sendEmailOtp(String email);
+	AuthenticatedUser verifyPhoneOtp(String phone, String otp);
 
-    Map<String, Object> verifyEmailOtp(String idUser, String email, String otp,String mode);
+	Map<String, Object> sendEmailOtp(String email);
 
-    Map<String, Object> forgotPassword(String email);
+	Map<String, Object> verifyEmailOtp(String email, String otp);
 
-    Map<String, Object> verifyForgotOtp(String email, String otp);
+	Map<String, Object> forgotPassword(String email);
 
-    Map<String, Object> resetPassword(String email, String newPassword);
-    
-    Map<String, Object> googleLogin(String accessToken);
+	Map<String, Object> verifyForgotOtp(String email, String otp);
 
-    Map<String, Object> register(
-            String email,
-            String password,
-            String fullName,
-            String gender,
-            String birthday
-    );
+	Map<String, Object> resetPassword(String email, String newPassword);
+
+	AuthenticatedUser googleLogin(String accessToken);
+
+	Map<String, Object> register(String email, String password, String fullName, String gender, String birthday);
 }

@@ -6,78 +6,64 @@ import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
 import com.garmentDesign.entity.ServiceOrder;
 import com.garmentDesign.service.ServiceOrderService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import java.security.Principal;
+import com.garmentDesign.dto.serviceorder.UserCreateServiceOrderRequest;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/service-orders")
-@CrossOrigin(origins = "*")
 public class ServiceOrderController {
-    private final ServiceOrderService service;
+	private final ServiceOrderService service;
 
-    public ServiceOrderController(ServiceOrderService service) {
-        this.service = service;
-    }
+	public ServiceOrderController(ServiceOrderService service) {
+		this.service = service;
+	}
 
-    @GetMapping
-    public List<ServiceOrder> getAll() {
-        return service.findAll();
-    }
+	@GetMapping
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public List<ServiceOrder> getAll() {
+		return service.findAll();
+	}
 
-    @GetMapping("/{id}")
-    public ServiceOrder getById(@PathVariable Long id) {
-        return service.findById(id);
-    }
+	@GetMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ServiceOrder getById(@PathVariable Long id) {
+		return service.findById(id);
+	}
 
-    @PostMapping
-    public ServiceOrder create(@RequestBody ServiceOrder data) {
-        return service.save(data);
-    }
+	@GetMapping("/me")
+	public List<ServiceOrder> getMine(Principal principal) {
+		return service.findByUserId(principal.getName());
+	}
 
-    @PutMapping("/{id}")
-    public ServiceOrder update(@PathVariable Long id, @RequestBody ServiceOrder data) {
-        return service.update(id, data);
-    }
-    
-    @PatchMapping("/{orderId}/user/{idUser}")
-    public ServiceOrder updateByUser(
-            @PathVariable Long orderId,
-            @PathVariable String idUser,
-            @RequestBody UserUpdateServiceOrderRequest request
-    ) {
-        return service.updateByUser(
-            orderId,
-            idUser,
-            request
-        );
-    }
-    
-    @PatchMapping("/{orderId}/user/{idUser}/address")
-    public ServiceOrder updateAddressByUser(
-            @PathVariable Long orderId,
-            @PathVariable String idUser,
-            @RequestBody UserUpdateOrderAddressRequest request
-    ) {
-        return service.updateAddressByUser(
-            orderId,
-            idUser,
-            request
-        );
-    }
+	@PostMapping("/me")
+	public ServiceOrder createMine(Principal principal, @RequestBody UserCreateServiceOrderRequest request) {
+		return service.createByUser(principal.getName(), request);
+	}
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        service.delete(id);
-        return ResponseEntity.noContent().build();
-    }
-    
-    @DeleteMapping("/{orderId}/user/{idUser}")
-    public ResponseEntity<UserRemoveServiceOrderResponse> removeByUser(@PathVariable Long orderId,@PathVariable String idUser) {
-    	    return ResponseEntity.ok(service.removeByUser(orderId,idUser));
-    	}
-    
-    @GetMapping("/user/{idUser}")
-    public List<ServiceOrder> getByUser(@PathVariable String idUser) {
-        return service.findByUserId(idUser);
-    }
+	@PatchMapping("/me/{orderId}")
+	public ServiceOrder updateMine(@PathVariable Long orderId, Principal principal,
+			@RequestBody UserUpdateServiceOrderRequest request) {
+		return service.updateByUser(orderId, principal.getName(), request);
+	}
+
+	@PatchMapping("/me/{orderId}/address")
+	public ServiceOrder updateMyAddress(@PathVariable Long orderId, Principal principal,
+			@RequestBody UserUpdateOrderAddressRequest request) {
+		return service.updateAddressByUser(orderId, principal.getName(), request);
+	}
+
+	@DeleteMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ResponseEntity<Void> delete(@PathVariable Long id) {
+		service.delete(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@DeleteMapping("/me/{orderId}")
+	public ResponseEntity<UserRemoveServiceOrderResponse> removeMine(@PathVariable Long orderId, Principal principal) {
+		return ResponseEntity.ok(service.removeByUser(orderId, principal.getName()));
+	}
 }

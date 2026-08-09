@@ -9,148 +9,166 @@ import java.util.List;
 @Table(name = "Users")
 public class User {
 
-    @Id	@Column(name = "id_User", length = 5)				private String idUser;
+	@Id
+	@Column(name = "id_User", length = 5)
+	private String idUser;
 
-    @Column(name = "user_code", unique = true, length = 20)	private String userCode;
-    @Column(name = "full_name", length = 100)				private String fullName;
-    @Column(name = "avatar")								private String avatar;
-    @Column(name = "gender", length = 10)					private String gender;
-    @Column(name = "birthday")								private LocalDate birthday;
+	@Column(name = "user_code", unique = true, length = 20)
+	private String userCode;
+	@Column(name = "full_name", length = 100)
+	private String fullName;
+	@Column(name = "avatar")
+	private String avatar;
+	@Column(name = "gender", length = 10)
+	private String gender;
+	@Column(name = "birthday")
+	private LocalDate birthday;
 
-    @ManyToOne	@JoinColumn(name = "id_role")				private Role role;
-    @ManyToOne	@JoinColumn(name = "default_address_id")	private UserAddress defaultAddress;
-    
-    @OneToMany(mappedBy = "user")							private List<UserAddress> addresses;
+	@ManyToOne
+	@JoinColumn(name = "id_role")
+	private Role role;
+	@ManyToOne
+	@JoinColumn(name = "default_address_id")
+	private UserAddress defaultAddress;
 
-    @Column(name = "status")								private String status;
+	@OneToMany(mappedBy = "user")
+	private List<UserAddress> addresses;
 
-    @Column(name = "last_login")							private LocalDateTime lastLogin;
-    @Column(name = "created_at")							private LocalDateTime createdAt;
-    @Column(name = "updated_at") 							private LocalDateTime updatedAt;
-    @Column(name = "deleted_at")							private LocalDateTime deletedAt;
+	@Column(name = "status")
+	private String status;
 
-    public User() {}
+	@Column(name = "last_login")
+	private LocalDateTime lastLogin;
+	@Column(name = "created_at")
+	private LocalDateTime createdAt;
+	@Column(name = "updated_at")
+	private LocalDateTime updatedAt;
+	@Column(name = "deleted_at")
+	private LocalDateTime deletedAt;
 
-    @PrePersist
-    public void prePersist() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
+	public User() {
+	}
 
-    @PreUpdate
-    public void preUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
+	@PrePersist
+	public void prePersist() {
+		createdAt = LocalDateTime.now();
+		updatedAt = LocalDateTime.now();
+	}
 
-    public String getIdUser() {
-        return idUser;
-    }
+	@PreUpdate
+	public void preUpdate() {
+		updatedAt = LocalDateTime.now();
+	}
 
-    public void setIdUser(String idUser) {
-        this.idUser = idUser;
-    }
+	public String getIdUser() {
+		return idUser;
+	}
 
-    public String getUserCode() {
-        return userCode;
-    }
+	public void setIdUser(String idUser) {
+		this.idUser = idUser;
+	}
 
-    public void setUserCode(String userCode) {
-        this.userCode = userCode;
-    }
+	public String getUserCode() {
+		return userCode;
+	}
 
-    public String getFullName() {
-        return fullName;
-    }
+	public void setUserCode(String userCode) {
+		this.userCode = userCode;
+	}
 
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
+	public String getFullName() {
+		return fullName;
+	}
 
-    public String getAvatar() {
-        return avatar;
-    }
+	public void setFullName(String fullName) {
+		this.fullName = fullName;
+	}
 
-    public void setAvatar(String avatar) {
-        this.avatar = avatar;
-    }
+	public String getAvatar() {
+		return avatar;
+	}
 
-    public String getGender() {
-        return gender;
-    }
+	public void setAvatar(String avatar) {
+		this.avatar = avatar;
+	}
 
-    public void setGender(String gender) {
-        this.gender = gender;
-    }
+	public String getGender() {
+		return gender;
+	}
 
-    public LocalDate getBirthday() {
-        return birthday;
-    }
+	public void setGender(String gender) {
+		this.gender = gender;
+	}
 
-    public void setBirthday(LocalDate birthday) {
-        this.birthday = birthday;
-    }
+	public LocalDate getBirthday() {
+		return birthday;
+	}
 
-    public Role getRole() {
-        return role;
-    }
+	public void setBirthday(LocalDate birthday) {
+		this.birthday = birthday;
+	}
 
-    public void setRole(Role role) {
-        this.role = role;
-    }
+	public Role getRole() {
+		return role;
+	}
 
-    public UserAddress getDefaultAddress() {
-        return defaultAddress;
-    }
+	public void setRole(Role role) {
+		this.role = role;
+	}
 
-    public void setDefaultAddress(UserAddress defaultAddress) {
-        this.defaultAddress = defaultAddress;
-    }
+	public UserAddress getDefaultAddress() {
+		return defaultAddress;
+	}
 
-    public String getStatus() {
-        return status;
-    }
+	public void setDefaultAddress(UserAddress defaultAddress) {
+		this.defaultAddress = defaultAddress;
+	}
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
+	public String getStatus() {
+		return status;
+	}
 
-    public LocalDateTime getLastLogin() {
-        return lastLogin;
-    }
+	public void setStatus(String status) {
+		this.status = status;
+	}
 
-    public void setLastLogin(LocalDateTime lastLogin) {
-        this.lastLogin = lastLogin;
-    }
+	public LocalDateTime getLastLogin() {
+		return lastLogin;
+	}
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+	public void setLastLogin(LocalDateTime lastLogin) {
+		this.lastLogin = lastLogin;
+	}
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
 
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
+	}
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+	public LocalDateTime getUpdatedAt() {
+		return updatedAt;
+	}
 
-    public LocalDateTime getDeletedAt() {
-        return deletedAt;
-    }
+	public void setUpdatedAt(LocalDateTime updatedAt) {
+		this.updatedAt = updatedAt;
+	}
 
-    public void setDeletedAt(LocalDateTime deletedAt) {
-        this.deletedAt = deletedAt;
-    }
-    
-    public List<UserAddress> getAddresses() {
-        return addresses;
-    }
+	public LocalDateTime getDeletedAt() {
+		return deletedAt;
+	}
 
-    public void setAddresses(List<UserAddress> addresses) {
-        this.addresses = addresses;
-    }
+	public void setDeletedAt(LocalDateTime deletedAt) {
+		this.deletedAt = deletedAt;
+	}
+
+	public List<UserAddress> getAddresses() {
+		return addresses;
+	}
+
+	public void setAddresses(List<UserAddress> addresses) {
+		this.addresses = addresses;
+	}
 }

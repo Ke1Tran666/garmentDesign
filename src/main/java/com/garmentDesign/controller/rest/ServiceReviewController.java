@@ -5,6 +5,7 @@ import com.garmentDesign.dto.servicereview.ServiceReviewRequest;
 import com.garmentDesign.dto.servicereview.ServiceReviewResponse;
 import com.garmentDesign.service.ServiceReviewService;
 
+import java.security.Principal;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -13,104 +14,64 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/service-reviews")
-@CrossOrigin(origins = "*")
 public class ServiceReviewController {
 
-    private final ServiceReviewService service;
+	private final ServiceReviewService service;
 
-    public ServiceReviewController(
-            ServiceReviewService service
-    ) {
-        this.service = service;
-    }
+	public ServiceReviewController(ServiceReviewService service) {
+		this.service = service;
+	}
 
-    @GetMapping("/public")
-    public ResponseEntity<List<ServiceReviewResponse>>
-            findPublicReviews() {
-        return ResponseEntity.ok(
-            service.findPublicReviews()
-        );
-    }
+	/*
+	 * Nội dung công khai, không cần đăng nhập.
+	 */
+	@GetMapping("/public")
+	public ResponseEntity<List<ServiceReviewResponse>> findPublicReviews() {
+		return ResponseEntity.ok(service.findPublicReviews());
+	}
 
-    @GetMapping("/user/{idUser}")
-    public ResponseEntity<List<ServiceReviewResponse>>
-            findByUser(
-                @PathVariable("idUser")
-                String idUser
-            ) {
-        return ResponseEntity.ok(
-            service.findByUser(idUser)
-        );
-    }
+	/*
+	 * Danh sách đánh giá của người đang đăng nhập.
+	 */
+	@GetMapping("/me")
+	public ResponseEntity<List<ServiceReviewResponse>> findMine(Principal principal) {
+		return ResponseEntity.ok(service.findByUser(principal.getName()));
+	}
 
-    @GetMapping("/user/{idUser}/orders")
-    public ResponseEntity<List<ReviewableOrderResponse>>
-            findReviewableOrders(
-                @PathVariable("idUser")
-                String idUser
-            ) {
-        return ResponseEntity.ok(
-            service.findReviewableOrders(idUser)
-        );
-    }
+	/*
+	 * Các đơn hàng người hiện tại có thể đánh giá.
+	 */
+	@GetMapping("/me/orders")
+	public ResponseEntity<List<ReviewableOrderResponse>> findMyReviewableOrders(Principal principal) {
+		return ResponseEntity.ok(service.findReviewableOrders(principal.getName()));
+	}
 
-    @PostMapping("/order/{orderId}/user/{idUser}")
-    public ResponseEntity<ServiceReviewResponse>
-            createByUser(
-                @PathVariable("orderId")
-                Long orderId,
+	/*
+	 * Tạo đánh giá cho đơn hàng thuộc người hiện tại.
+	 */
+	@PostMapping("/me/orders/{orderId}")
+	public ResponseEntity<ServiceReviewResponse> createMine(@PathVariable Long orderId, Principal principal,
+			@RequestBody ServiceReviewRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED)
+				.body(service.createByUser(orderId, principal.getName(), request));
+	}
 
-                @PathVariable("idUser")
-                String idUser,
+	/*
+	 * Cập nhật đánh giá thuộc người hiện tại.
+	 */
+	@PutMapping("/me/{reviewId}")
+	public ResponseEntity<ServiceReviewResponse> updateMine(@PathVariable Long reviewId, Principal principal,
+			@RequestBody ServiceReviewRequest request) {
+		return ResponseEntity.ok(service.updateByUser(reviewId, principal.getName(), request));
+	}
 
-                @RequestBody
-                ServiceReviewRequest request
-            ) {
-        return ResponseEntity
-            .status(HttpStatus.CREATED)
-            .body(
-                service.createByUser(
-                    orderId,
-                    idUser,
-                    request
-                )
-            );
-    }
+	/*
+	 * Xóa mềm đánh giá thuộc người hiện tại.
+	 */
+	@DeleteMapping("/me/{reviewId}")
+	public ResponseEntity<Void> deleteMine(@PathVariable Long reviewId, Principal principal) {
+		service.deleteByUser(reviewId, principal.getName());
 
-    @PutMapping("/{reviewId}/user/{idUser}")
-    public ResponseEntity<ServiceReviewResponse>
-            updateByUser(
-                @PathVariable("reviewId")
-                Long reviewId,
-
-                @PathVariable("idUser")
-                String idUser,
-
-                @RequestBody
-                ServiceReviewRequest request
-            ) {
-        return ResponseEntity.ok(
-            service.updateByUser(
-                reviewId,
-                idUser,
-                request
-            )
-        );
-    }
-
-    @DeleteMapping("/{reviewId}/user/{idUser}")
-    public ResponseEntity<Void> deleteByUser(
-            @PathVariable("reviewId")
-            Long reviewId,
-
-            @PathVariable("idUser")
-            String idUser
-    ) {
-        service.deleteByUser(
-            reviewId,
-            idUser
-        );
-
-        return ResponseEntity.noContent().build();
-    }
+		return ResponseEntity.noContent().build();
+	}
 }

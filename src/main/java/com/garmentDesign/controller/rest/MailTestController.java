@@ -10,26 +10,23 @@ import java.util.Map;
 @RequestMapping("/api/mail")
 public class MailTestController {
 
-    private final JavaMailSender mailSender;
+	private final JavaMailSender mailSender;
 
-    public MailTestController(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+	public MailTestController(JavaMailSender mailSender) {
+		this.mailSender = mailSender;
+	}
 
-    @PostMapping("/test")
-    public Map<String, Object> testMail(@RequestBody Map<String, String> request) {
-        String to = request.get("to");
+	@PostMapping("/test")
+	public Map<String, Object> testMail(@RequestBody Map<String, String> request) {
+		String to = request.get("to");
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject("Test gửi mail từ Garment Design");
-        message.setText("Xin chào, đây là email test từ Spring Boot.");
+		SimpleMailMessage message = new SimpleMailMessage();
+		message.setTo(to);
+		message.setSubject("Test gửi mail từ Garment Design");
+		message.setText("Xin chào, đây là email test từ Spring Boot.");
 
-        mailSender.send(message);
+		mailSender.send(message);
 
-        return Map.of(
-                "success", true,
-                "message", "Đã gửi mail test tới " + to
-        );
-    }
+		return Map.of("success", true, "message", "Đã gửi mail test tới " + to);
+	}
 }
