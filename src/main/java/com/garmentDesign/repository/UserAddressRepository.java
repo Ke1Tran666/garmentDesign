@@ -17,4 +17,6 @@ public interface UserAddressRepository extends JpaRepository<UserAddress, Long> 
 			String companyName, String address);
 
 	Optional<UserAddress> findByAddressIdAndUser_IdUserAndDeletedAtIsNull(Long addressId, String idUser);
+
+	boolean existsByUser_IdUserAndDeletedAtIsNull(String idUser);
 }

@@ -10,16 +10,23 @@ import com.garmentDesign.entity.UserAddress;
 import com.garmentDesign.repository.UserAddressRepository;
 import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.UserAddressService;
+import com.garmentDesign.service.UserStatusService;
+
+import jakarta.transaction.Transactional;
+
 import org.springframework.security.access.AccessDeniedException;
 
 @Service
 public class UserAddressServiceImpl implements UserAddressService {
 	private final UserAddressRepository repository;
 	private final UserRepository userRepository;
+	private final UserStatusService userStatusService;
 
-	public UserAddressServiceImpl(UserAddressRepository repository, UserRepository userRepository) {
+	public UserAddressServiceImpl(UserAddressRepository repository, UserRepository userRepository,
+			UserStatusService userStatusService) {
 		this.repository = repository;
 		this.userRepository = userRepository;
+		this.userStatusService = userStatusService;
 	}
 
 	private UserAddress requireOwnedAddress(String idUser, Long addressId) {
@@ -48,12 +55,15 @@ public class UserAddressServiceImpl implements UserAddressService {
 	}
 
 	@Override
+	@Transactional
 	public UserAddress createByUser(String idUser, UserAddress data) {
 		User user = userRepository.findById(idUser)
-				.orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + idUser));
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
 		UserAddress oldAddress = repository.findByUser_IdUserAndCompanyNameIgnoreCaseAndAddressIgnoreCase(idUser,
 				data.getCompanyName(), data.getAddress()).orElse(null);
+
+		UserAddress savedAddress;
 
 		if (oldAddress != null) {
 			oldAddress.setDeletedAt(null);
@@ -61,14 +71,18 @@ public class UserAddressServiceImpl implements UserAddressService {
 			oldAddress.setCompanyName(data.getCompanyName());
 			oldAddress.setAddress(data.getAddress());
 
-			return repository.save(oldAddress);
+			savedAddress = repository.save(oldAddress);
+		} else {
+			data.setUser(user);
+			data.setAddressId(null);
+			data.setDeletedAt(null);
+
+			savedAddress = repository.save(data);
 		}
 
-		data.setUser(user);
-		data.setAddressId(null);
-		data.setDeletedAt(null);
+		userStatusService.refreshStatus(user);
 
-		return repository.save(data);
+		return savedAddress;
 	}
 
 	@Override
@@ -92,16 +106,12 @@ public class UserAddressServiceImpl implements UserAddressService {
 	}
 
 	@Override
+	@Transactional
 	public UserAddress setDefaultAddress(String idUser, Long addressId) {
 		User user = userRepository.findById(idUser)
-				.orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + idUser));
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
-		UserAddress address = repository.findById(addressId)
-				.orElseThrow(() -> new RuntimeException("Không tìm thấy địa chỉ với id: " + addressId));
-
-		if (!address.getUser().getIdUser().equals(idUser)) {
-			throw new RuntimeException("Địa chỉ này không thuộc user hiện tại");
-		}
+		UserAddress address = requireOwnedAddress(idUser, addressId);
 
 		user.setDefaultAddress(address);
 		userRepository.save(user);
@@ -123,12 +133,22 @@ public class UserAddressServiceImpl implements UserAddressService {
 	}
 
 	@Override
+	@Transactional
 	public void deleteByUser(String idUser, Long addressId) {
 		UserAddress address = requireOwnedAddress(idUser, addressId);
+
+		User user = address.getUser();
+
+		if (user.getDefaultAddress() != null && addressId.equals(user.getDefaultAddress().getAddressId())) {
+			user.setDefaultAddress(null);
+			userRepository.save(user);
+		}
 
 		address.setDeletedAt(java.time.LocalDateTime.now());
 
 		repository.save(address);
+
+		userStatusService.refreshStatus(user);
 	}
 
 }

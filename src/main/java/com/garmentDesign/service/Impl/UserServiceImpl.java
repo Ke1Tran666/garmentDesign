@@ -24,6 +24,7 @@ import com.garmentDesign.repository.UserAuthProviderRepository;
 import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.PasswordService;
 import com.garmentDesign.service.UserService;
+import com.garmentDesign.service.UserStatusService;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -31,13 +32,16 @@ public class UserServiceImpl implements UserService {
 	private final UserAuthProviderRepository authProviderRepository;
 	private final UserAddressRepository addressRepository;
 	private final PasswordService passwordService;
+	private final UserStatusService userStatusService;
 
 	public UserServiceImpl(UserRepository repository, UserAuthProviderRepository authProviderRepository,
-			UserAddressRepository addressRepository, PasswordService passwordService) {
+			UserAddressRepository addressRepository, PasswordService passwordService,
+			UserStatusService userStatusService) {
 		this.repository = repository;
 		this.authProviderRepository = authProviderRepository;
 		this.addressRepository = addressRepository;
 		this.passwordService = passwordService;
+		this.userStatusService = userStatusService;
 	}
 
 	private String generateUserCode(String fullName, String gender, LocalDate birthday, String oldUserCode,
@@ -161,24 +165,8 @@ public class UserServiceImpl implements UserService {
 		return repository.save(data);
 	}
 
-	private void updateUserStatus(User user) {
-
-		boolean hasProfileInfo = user.getFullName() != null && !user.getFullName().trim().isEmpty()
-				&& user.getBirthday() != null && user.getGender() != null
-				&& !"Unknown".equalsIgnoreCase(user.getGender());
-
-		boolean hasVerifiedContact = authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
-				.stream()
-				.anyMatch(provider -> provider.getEmailVerifiedAt() != null || provider.getPhoneVerifiedAt() != null);
-
-		if (hasProfileInfo && hasVerifiedContact) {
-			user.setStatus("active");
-		} else {
-			user.setStatus("pending");
-		}
-	}
-
 	@Override
+	@Transactional
 	public User updateProfile(String id, UpdateProfileRequest request) {
 		User user = findById(id);
 
@@ -190,22 +178,11 @@ public class UserServiceImpl implements UserService {
 				user.getUserCode(), user.getIdUser());
 
 		user.setUserCode(newUserCode);
-
-		boolean hasVerifiedContact = authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
-				.stream()
-				.anyMatch(provider -> provider.getEmailVerifiedAt() != null || provider.getPhoneVerifiedAt() != null);
-
-		if (hasVerifiedContact && user.getFullName() != null && !user.getFullName().trim().isEmpty()
-				&& user.getBirthday() != null && !"Unknown".equalsIgnoreCase(user.getGender())) {
-
-			user.setStatus("active");
-		}
-
-		updateUserStatus(user);
-
 		user.setUpdatedAt(LocalDateTime.now());
 
-		return repository.save(user);
+		repository.save(user);
+
+		return userStatusService.refreshStatus(user);
 	}
 
 	@Override
@@ -220,8 +197,6 @@ public class UserServiceImpl implements UserService {
 		User user = repository.findById(idUser).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
 		user.setAvatar(null);
-
-		updateUserStatus(user);
 
 		user.setUpdatedAt(LocalDateTime.now());
 
@@ -273,8 +248,6 @@ public class UserServiceImpl implements UserService {
 			String avatarUrl = "http://localhost:8080/uploads/avatars/" + fileName;
 
 			user.setAvatar(avatarUrl);
-
-			updateUserStatus(user);
 
 			repository.save(user);
 

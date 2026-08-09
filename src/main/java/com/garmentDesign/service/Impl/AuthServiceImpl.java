@@ -13,6 +13,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.garmentDesign.dto.auth.AuthenticatedUser;
@@ -25,6 +26,7 @@ import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.AuthService;
 import com.garmentDesign.service.OtpService;
 import com.garmentDesign.service.PasswordService;
+import com.garmentDesign.service.UserStatusService;
 
 import java.util.Locale;
 
@@ -36,17 +38,20 @@ public class AuthServiceImpl implements AuthService {
 	private final RoleRepository roleRepository;
 	private final OtpService otpService;
 	private final PasswordService passwordService;
+	private final UserStatusService userStatusService;
 
 	private static final String VERIFY_EMAIL_OTP = "verify-email";
 	private static final String RESET_PASSWORD_OTP = "reset-password";
 
 	public AuthServiceImpl(UserAuthProviderRepository authProviderRepository, UserRepository userRepository,
-			RoleRepository roleRepository, OtpService otpService, PasswordService passwordService) {
+			RoleRepository roleRepository, OtpService otpService, PasswordService passwordService,
+			UserStatusService userStatusService) {
 		this.authProviderRepository = authProviderRepository;
 		this.userRepository = userRepository;
 		this.roleRepository = roleRepository;
 		this.otpService = otpService;
 		this.passwordService = passwordService;
+		this.userStatusService = userStatusService;
 	}
 
 	private String normalizeEmail(String email) {
@@ -58,19 +63,30 @@ public class AuthServiceImpl implements AuthService {
 	}
 
 	private void validateUserStatus(User user) {
+		if (user == null) {
+			throw new RuntimeException("Không tìm thấy tài khoản");
+		}
+
 		if ("inactive".equalsIgnoreCase(user.getStatus())) {
+
 			throw new RuntimeException(
-					"Tài khoản của bạn đang tạm ngưng hoạt động. Vui lòng liên hệ hotline để được hỗ trợ.");
+					"Tài khoản của bạn đang tạm ngưng hoạt động. " + "Vui lòng liên hệ hotline để được hỗ trợ.");
 		}
 
 		if ("banned".equalsIgnoreCase(user.getStatus())) {
-			throw new RuntimeException("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hotline để được hỗ trợ.");
+
+			throw new RuntimeException("Tài khoản của bạn đã bị khóa. " + "Vui lòng liên hệ hotline để được hỗ trợ.");
 		}
 
 		if ("delete".equalsIgnoreCase(user.getStatus())) {
+
 			throw new RuntimeException(
-					"Tài khoản của bạn đã bị xóa. Nếu muốn khôi phục vui lòng liên hệ hotline để được hỗ trợ.");
+					"Tài khoản của bạn đã bị xóa. " + "Nếu muốn khôi phục, vui lòng liên hệ hotline.");
 		}
+
+		/*
+		 * Không chặn pending.
+		 */
 	}
 
 	private AuthenticatedUser createLoginResult(User user) {
@@ -144,33 +160,6 @@ public class AuthServiceImpl implements AuthService {
 		return user;
 	}
 
-	private void updateUserStatus(User user) {
-		if ("delete".equalsIgnoreCase(user.getStatus())) {
-			return;
-		}
-
-		if ("banned".equalsIgnoreCase(user.getStatus())) {
-			return;
-		}
-
-		boolean hasProfileInfo = user.getFullName() != null && !user.getFullName().trim().isEmpty()
-				&& user.getBirthday() != null && user.getGender() != null
-				&& !"Unknown".equalsIgnoreCase(user.getGender());
-
-		boolean hasVerifiedContact = authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
-				.stream()
-				.anyMatch(provider -> provider.getEmailVerifiedAt() != null || provider.getPhoneVerifiedAt() != null);
-
-		if (hasProfileInfo && hasVerifiedContact) {
-			user.setStatus("active");
-		} else {
-			user.setStatus("pending");
-		}
-
-		user.setUpdatedAt(LocalDateTime.now());
-		userRepository.save(user);
-	}
-
 	@Override
 	@Transactional
 	public AuthenticatedUser login(String email, String password) {
@@ -181,21 +170,26 @@ public class AuthServiceImpl implements AuthService {
 			throw new RuntimeException("Mật khẩu không được để trống");
 		}
 
-		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
-				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+		UserAuthProvider auth = authProviderRepository
+				.findByEmailAndProviderAndDeletedAtIsNull(normalizedEmail, "local")
+				.orElseThrow(() -> new RuntimeException("Email hoặc mật khẩu không đúng"));
 
 		User user = auth.getUser();
 
+		/*
+		 * Chỉ chặn inactive, banned và delete. pending vẫn được đăng nhập.
+		 */
 		validateUserStatus(user);
 
 		String storedPassword = auth.getPassword();
 
 		if (!passwordService.matches(password, storedPassword)) {
 
-			throw new RuntimeException("Mật khẩu không đúng");
+			throw new RuntimeException("Email hoặc mật khẩu không đúng");
 		}
 
 		if (passwordService.needsUpgrade(storedPassword)) {
+
 			auth.setPassword(passwordService.encode(password));
 
 			auth.setUpdatedAt(LocalDateTime.now());
@@ -271,7 +265,7 @@ public class AuthServiceImpl implements AuthService {
 			authProviderRepository.save(newProvider);
 		}
 
-		updateUserStatus(user);
+		userStatusService.refreshStatus(user);
 
 		otpService.clearOtp(normalizedPhone, "phone");
 
@@ -314,8 +308,8 @@ public class AuthServiceImpl implements AuthService {
 		provider.setUpdatedAt(LocalDateTime.now());
 
 		authProviderRepository.save(provider);
-
-		updateUserStatus(user);
+		
+		userStatusService.refreshStatus(user);
 
 		otpService.clearOtp(normalizedEmail, VERIFY_EMAIL_OTP);
 
@@ -414,9 +408,9 @@ public class AuthServiceImpl implements AuthService {
 
 		validateUserStatus(user);
 
-		if ("pending".equalsIgnoreCase(user.getStatus())) {
+		if (!"active".equalsIgnoreCase(user.getStatus())) {
 
-			throw new RuntimeException("Tài khoản chưa hoàn tất đăng ký. " + "Vui lòng xác thực email trước.");
+			throw new RuntimeException("Tính năng quên mật khẩu chỉ áp dụng " + "cho tài khoản đã kích hoạt.");
 		}
 
 		otpService.sendOtp(normalizedEmail, RESET_PASSWORD_OTP);
@@ -472,66 +466,167 @@ public class AuthServiceImpl implements AuthService {
 		return Map.of("message", "Đổi mật khẩu thành công");
 	}
 
+	private User createPendingGoogleUser(String fullName) {
+		String idUser = generateRandom5Number();
+		String prefixName = generateNameCode(fullName);
+		String userCode = prefixName + "U00" + idUser;
+
+		Role userRole = roleRepository.findById(3L).orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
+
+		User user = new User();
+		user.setIdUser(idUser);
+		user.setUserCode(userCode);
+		user.setFullName(fullName);
+		user.setGender("Unknown");
+
+		/*
+		 * Google đã xác thực email, nhưng tài khoản vẫn chưa đủ hồ sơ và địa chỉ.
+		 */
+		user.setStatus("pending");
+		user.setRole(userRole);
+
+		return userRepository.save(user);
+	}
+
 	@Override
+	@Transactional
+	@SuppressWarnings("unchecked")
 	public AuthenticatedUser googleLogin(String accessToken) {
-		if (accessToken == null || accessToken.trim().isEmpty()) {
+		if (accessToken == null || accessToken.isBlank()) {
 			throw new RuntimeException("Google access token không hợp lệ");
 		}
 
-		RestTemplate restTemplate = new RestTemplate();
+		Map<String, Object> googleUser;
 
-		HttpHeaders headers = new HttpHeaders();
-		headers.setBearerAuth(accessToken);
+		try {
+			RestTemplate restTemplate = new RestTemplate();
 
-		HttpEntity<String> entity = new HttpEntity<>(headers);
+			HttpHeaders headers = new HttpHeaders();
+			headers.setBearerAuth(accessToken.trim());
 
-		ResponseEntity<Map> response = restTemplate.exchange("https://www.googleapis.com/oauth2/v3/userinfo",
-				HttpMethod.GET, entity, Map.class);
+			HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
-		Map<String, Object> googleUser = response.getBody();
+			ResponseEntity<Map> response = restTemplate.exchange("https://www.googleapis.com/oauth2/v3/userinfo",
+					HttpMethod.GET, requestEntity, Map.class);
 
-		if (googleUser == null || googleUser.get("email") == null) {
-			throw new RuntimeException("Không lấy được thông tin Google");
+			googleUser = response.getBody();
+		} catch (RestClientException exception) {
+			throw new RuntimeException("Không thể xác thực tài khoản Google", exception);
 		}
 
-		String googleId = googleUser.get("sub").toString();
-		String email = googleUser.get("email").toString();
-		String fullName = googleUser.get("name") != null ? googleUser.get("name").toString() : "Google User";
+		if (googleUser == null) {
+			throw new RuntimeException("Không lấy được thông tin tài khoản Google");
+		}
 
-		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(email, "google").orElse(null);
+		Object subValue = googleUser.get("sub");
+		Object emailValue = googleUser.get("email");
+		Object verifiedValue = googleUser.get("email_verified");
+
+		if (subValue == null || emailValue == null || verifiedValue == null) {
+			throw new RuntimeException("Thông tin Google không đầy đủ");
+		}
+
+		String googleId = subValue.toString().trim();
+		String normalizedEmail = normalizeEmail(emailValue.toString());
+
+		boolean emailVerified = Boolean.TRUE.equals(verifiedValue) || "true".equalsIgnoreCase(verifiedValue.toString());
+
+		if (googleId.isEmpty()) {
+			throw new RuntimeException("Google user ID không hợp lệ");
+		}
+
+		if (!emailVerified) {
+			throw new RuntimeException("Email Google chưa được xác thực");
+		}
+
+		String fullName = googleUser.get("name") != null && !googleUser.get("name").toString().isBlank()
+				? googleUser.get("name").toString().trim()
+				: "Google User";
+
+		/*
+		 * 1. Tìm theo Google sub.
+		 *
+		 * Email Google có thể thay đổi, nhưng sub là định danh ổn định của tài khoản
+		 * Google.
+		 */
+		UserAuthProvider googleProvider = authProviderRepository.findByProviderIdAndProvider(googleId, "google")
+				.orElse(null);
+
+		if (googleProvider != null) {
+			User user = googleProvider.getUser();
+
+			validateUserStatus(user);
+
+			/*
+			 * Cho phép khôi phục provider đã soft-delete khi chính chủ đăng nhập lại bằng
+			 * Google.
+			 */
+			googleProvider.setDeletedAt(null);
+			googleProvider.setEmail(normalizedEmail);
+
+			if (googleProvider.getEmailVerifiedAt() == null) {
+				googleProvider.setEmailVerifiedAt(LocalDateTime.now());
+			}
+
+			googleProvider.setUpdatedAt(LocalDateTime.now());
+
+			authProviderRepository.save(googleProvider);
+
+			userStatusService.refreshStatus(user);
+
+			return createLoginResult(user);
+		}
+
+		/*
+		 * 2. Chưa có Google provider: kiểm tra tài khoản local cùng email.
+		 */
+		UserAuthProvider localProvider = authProviderRepository
+				.findByEmailAndProviderAndDeletedAtIsNull(normalizedEmail, "local").orElse(null);
 
 		User user;
 
-		if (auth != null) {
-			user = auth.getUser();
+		if (localProvider != null) {
+			user = localProvider.getUser();
+
 			validateUserStatus(user);
+
+			/*
+			 * Không tự động liên kết Google vào một tài khoản local chưa xác thực email.
+			 *
+			 * Nếu tự liên kết, người đang giữ mật khẩu local vẫn có thể đăng nhập vào tài
+			 * khoản vừa được chủ email xác thực bằng Google.
+			 */
+			if (localProvider.getEmailVerifiedAt() == null) {
+				throw new RuntimeException("Email này đã được đăng ký bằng tài khoản local "
+						+ "nhưng chưa xác thực. Vui lòng đăng nhập bằng "
+						+ "mật khẩu và xác thực email trước khi liên kết Google.");
+			}
 		} else {
-			String idUser = generateRandom5Number();
-			String prefixName = generateNameCode(fullName);
-			String userCode = prefixName + "U00" + idUser;
-
-			Role userRole = roleRepository.findById(3L)
-					.orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
-
-			user = new User();
-			user.setIdUser(idUser);
-			user.setUserCode(userCode);
-			user.setFullName(fullName);
-			user.setGender("Unknown");
-			user.setStatus("active");
-			user.setRole(userRole);
-
-			user = userRepository.save(user);
-
-			UserAuthProvider newAuth = new UserAuthProvider();
-			newAuth.setUser(user);
-			newAuth.setProvider("google");
-			newAuth.setProviderId(googleId);
-			newAuth.setEmail(email);
-			newAuth.setEmailVerifiedAt(LocalDateTime.now());
-
-			authProviderRepository.save(newAuth);
+			/*
+			 * 3. Người dùng Google hoàn toàn mới.
+			 */
+			user = createPendingGoogleUser(fullName);
 		}
+
+		/*
+		 * 4. Tạo provider Google.
+		 *
+		 * Google đã xác thực email nên emailVerifiedAt có dữ liệu ngay, không gửi OTP.
+		 */
+		UserAuthProvider newGoogleProvider = new UserAuthProvider();
+
+		newGoogleProvider.setUser(user);
+		newGoogleProvider.setProvider("google");
+		newGoogleProvider.setProviderId(googleId);
+		newGoogleProvider.setEmail(normalizedEmail);
+		newGoogleProvider.setPassword(null);
+		newGoogleProvider.setEmailVerifiedAt(LocalDateTime.now());
+		newGoogleProvider.setPhoneVerifiedAt(null);
+		newGoogleProvider.setDeletedAt(null);
+
+		authProviderRepository.save(newGoogleProvider);
+
+		userStatusService.refreshStatus(user);
 
 		return createLoginResult(user);
 	}

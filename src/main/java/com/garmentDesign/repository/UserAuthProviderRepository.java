@@ -13,12 +13,21 @@ public interface UserAuthProviderRepository extends JpaRepository<UserAuthProvid
 
 	Optional<UserAuthProvider> findByEmailAndProvider(String email, String provider);
 
+	Optional<UserAuthProvider> findByEmailAndProviderAndDeletedAtIsNull(String email, String provider);
+
 	Optional<UserAuthProvider> findByPhoneAndProvider(String phone, String provider);
+
+	/*
+	 * Dùng Google sub làm định danh chính.
+	 *
+	 * Không lọc deletedAt để có thể phát hiện provider cũ và xử lý khôi phục liên
+	 * kết an toàn.
+	 */
+	Optional<UserAuthProvider> findByProviderIdAndProvider(String providerId, String provider);
 
 	List<UserAuthProvider> findByUser_IdUserAndDeletedAtIsNull(String idUser);
 
 	long countByUser_IdUserAndDeletedAtIsNull(String idUser);
 
 	Optional<UserAuthProvider> findByUser_IdUserAndProviderAndDeletedAtIsNull(String idUser, String provider);
-
 }
