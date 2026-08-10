@@ -20,6 +20,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
+
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -54,8 +58,8 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository repository)
-			throws Exception {
+	public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository repository,
+			SessionRegistry sessionRegistry) throws Exception {
 
 		http.cors(Customizer.withDefaults())
 
@@ -63,8 +67,29 @@ public class SecurityConfig {
 
 				.securityContext(context -> context.securityContextRepository(repository).requireExplicitSave(true))
 
-				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-						.sessionFixation(fixation -> fixation.changeSessionId()))
+				.sessionManagement(session -> {
+					session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+							.sessionFixation(fixation -> fixation.changeSessionId());
+
+					/*
+					 * -1 nghĩa là không giới hạn số thiết bị đăng nhập. SessionRegistry vẫn theo
+					 * dõi các session để có thể vô hiệu hóa sau khi đổi mật khẩu.
+					 */
+					session.maximumSessions(-1).sessionRegistry(sessionRegistry).expiredSessionStrategy(event -> {
+						event.getResponse().setStatus(HttpStatus.UNAUTHORIZED.value());
+
+						event.getResponse().setCharacterEncoding("UTF-8");
+
+						event.getResponse().setContentType(MediaType.APPLICATION_JSON_VALUE);
+
+						event.getResponse().getWriter().write("""
+								{
+								  "message":
+								  "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại"
+								}
+								""");
+					});
+				})
 
 				.authorizeHttpRequests(auth -> auth
 						/*
@@ -145,5 +170,15 @@ public class SecurityConfig {
 						}));
 
 		return http.build();
+	}
+
+	@Bean
+	public SessionRegistry sessionRegistry() {
+		return new SessionRegistryImpl();
+	}
+
+	@Bean
+	public HttpSessionEventPublisher httpSessionEventPublisher() {
+		return new HttpSessionEventPublisher();
 	}
 }

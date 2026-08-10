@@ -6,11 +6,9 @@ public interface OtpService {
 
 	boolean verifyOtp(String target, String type, String otp);
 
-	void markVerified(String target, String type);
+	String createVerificationToken(String target, String type);
 
-	boolean isVerified(String target, String type);
+	boolean consumeVerificationToken(String target, String type, String token);
 
 	void clearOtp(String target, String type);
-
-	void clearVerified(String target, String type);
 }

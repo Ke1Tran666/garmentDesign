@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import com.garmentDesign.service.MailService;
 import com.garmentDesign.service.OtpService;
 
+import java.util.Base64;
+
 @Service
 public class OtpServiceImpl implements OtpService {
 
@@ -23,14 +25,14 @@ public class OtpServiceImpl implements OtpService {
 
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-	private static final int OTP_EXPIRY_MINUTES = 5;
-	private static final int VERIFIED_EXPIRY_MINUTES = 10;
+	private static final int OTP_EXPIRY_MINUTES = 3;
+	private static final int VERIFICATION_TOKEN_EXPIRY_MINUTES = 10;
 	private static final int RESEND_SECONDS = 60;
 	private static final int MAX_FAILED_ATTEMPTS = 5;
 
 	private final Map<String, OtpData> otpStorage = new ConcurrentHashMap<>();
 
-	private final Map<String, LocalDateTime> verifiedStorage = new ConcurrentHashMap<>();
+	private final Map<String, VerificationTokenData> verificationTokenStorage = new ConcurrentHashMap<>();
 
 	private final MailService mailService;
 	private final PasswordEncoder passwordEncoder;
@@ -73,6 +75,12 @@ public class OtpServiceImpl implements OtpService {
 		} else {
 			throw new RuntimeException("Loại OTP không được hỗ trợ");
 		}
+
+		/*
+		 * Khi gửi OTP mới, mọi reset token cũ của email và purpose tương ứng đều không
+		 * còn hiệu lực.
+		 */
+		verificationTokenStorage.remove(key);
 
 		otpStorage.put(key,
 				new OtpData(encodedOtp, now.plusMinutes(OTP_EXPIRY_MINUTES), now.plusSeconds(RESEND_SECONDS)));
@@ -120,34 +128,60 @@ public class OtpServiceImpl implements OtpService {
 	}
 
 	@Override
-	public void markVerified(String target, String type) {
-
+	public String createVerificationToken(String target, String type) {
 		String normalizedTarget = normalizeTarget(target, type);
 
 		String key = buildKey(normalizedTarget, type);
 
-		verifiedStorage.put(key, LocalDateTime.now().plusMinutes(VERIFIED_EXPIRY_MINUTES));
+		byte[] tokenBytes = new byte[32];
+
+		SECURE_RANDOM.nextBytes(tokenBytes);
+
+		String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+
+		String encodedToken = passwordEncoder.encode(rawToken);
+
+		VerificationTokenData tokenData = new VerificationTokenData(encodedToken,
+				LocalDateTime.now().plusMinutes(VERIFICATION_TOKEN_EXPIRY_MINUTES));
+
+		verificationTokenStorage.put(key, tokenData);
+
+		return rawToken;
 	}
 
 	@Override
-	public boolean isVerified(String target, String type) {
+	public boolean consumeVerificationToken(String target, String type, String token) {
+		if (token == null || token.isBlank()) {
+			return false;
+		}
 
 		String normalizedTarget = normalizeTarget(target, type);
 
 		String key = buildKey(normalizedTarget, type);
 
-		LocalDateTime expiresAt = verifiedStorage.get(key);
+		VerificationTokenData tokenData = verificationTokenStorage.get(key);
 
-		if (expiresAt == null) {
+		if (tokenData == null) {
 			return false;
 		}
 
-		if (expiresAt.isBefore(LocalDateTime.now())) {
-			verifiedStorage.remove(key, expiresAt);
+		if (tokenData.getExpiresAt().isBefore(LocalDateTime.now())) {
+
+			verificationTokenStorage.remove(key, tokenData);
+
 			return false;
 		}
 
-		return true;
+		boolean matches = passwordEncoder.matches(token.trim(), tokenData.getEncodedToken());
+
+		if (!matches) {
+			return false;
+		}
+
+		/*
+		 * remove(key, tokenData) bảo đảm chỉ một request được quyền sử dụng token.
+		 */
+		return verificationTokenStorage.remove(key, tokenData);
 	}
 
 	@Override
@@ -156,14 +190,6 @@ public class OtpServiceImpl implements OtpService {
 		String normalizedTarget = normalizeTarget(target, type);
 
 		otpStorage.remove(buildKey(normalizedTarget, type));
-	}
-
-	@Override
-	public void clearVerified(String target, String type) {
-
-		String normalizedTarget = normalizeTarget(target, type);
-
-		verifiedStorage.remove(buildKey(normalizedTarget, type));
 	}
 
 	private String buildKey(String normalizedTarget, String type) {
@@ -232,6 +258,25 @@ public class OtpServiceImpl implements OtpService {
 		synchronized boolean recordFailedAttempt() {
 			failedAttempts++;
 			return failedAttempts >= MAX_FAILED_ATTEMPTS;
+		}
+	}
+
+	private static class VerificationTokenData {
+
+		private final String encodedToken;
+		private final LocalDateTime expiresAt;
+
+		VerificationTokenData(String encodedToken, LocalDateTime expiresAt) {
+			this.encodedToken = encodedToken;
+			this.expiresAt = expiresAt;
+		}
+
+		String getEncodedToken() {
+			return encodedToken;
+		}
+
+		LocalDateTime getExpiresAt() {
+			return expiresAt;
 		}
 	}
 }

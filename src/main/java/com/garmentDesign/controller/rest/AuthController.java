@@ -30,20 +30,24 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
+import com.garmentDesign.service.UserSessionService;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
 	private final AuthService authService;
 	private final UserService userService;
+	private final UserSessionService userSessionService;
 
 	private final SecurityContextRepository securityContextRepository;
 
 	public AuthController(AuthService authService, UserService userService,
-			SecurityContextRepository securityContextRepository) {
+			SecurityContextRepository securityContextRepository, UserSessionService userSessionService) {
 		this.authService = authService;
 		this.userService = userService;
 		this.securityContextRepository = securityContextRepository;
+		this.userSessionService = userSessionService;
 	}
 
 	private void establishSession(AuthenticatedUser user, HttpServletRequest request, HttpServletResponse response) {
@@ -52,10 +56,12 @@ public class AuthController {
 		}
 
 		if (user.idUser() == null || user.idUser().isBlank()) {
+
 			throw new RuntimeException("Người dùng không hợp lệ");
 		}
 
 		if (user.role() == null || user.role().isBlank()) {
+
 			throw new RuntimeException("Tài khoản chưa được phân quyền");
 		}
 
@@ -66,12 +72,22 @@ public class AuthController {
 		Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(user.idUser(), null,
 				List.of(authority));
 
-		// Đổi ID session cũ để chống session fixation.
 		HttpSession existingSession = request.getSession(false);
 
 		if (existingSession != null) {
+			/*
+			 * Xóa session ID cũ khỏi registry trước khi Spring đổi ID chống session
+			 * fixation.
+			 */
+			userSessionService.removeSession(existingSession.getId());
+
 			request.changeSessionId();
 		}
+
+		/*
+		 * Đảm bảo đã có HttpSession trước khi lưu context.
+		 */
+		HttpSession authenticatedSession = request.getSession(true);
 
 		SecurityContext context = SecurityContextHolder.createEmptyContext();
 
@@ -80,6 +96,8 @@ public class AuthController {
 		SecurityContextHolder.setContext(context);
 
 		securityContextRepository.saveContext(context, request, response);
+
+		userSessionService.registerSession(authenticatedSession.getId(), user.idUser());
 	}
 
 	@PostMapping("/login")
@@ -135,13 +153,14 @@ public class AuthController {
 
 	@PostMapping("/reset-password")
 	public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
-		return ResponseEntity.ok(authService.resetPassword(body.get("email"), body.get("newPassword")));
+		return ResponseEntity
+				.ok(authService.resetPassword(body.get("email"), body.get("newPassword"), body.get("resetToken")));
 	}
 
 	@PostMapping("/google-login")
 	public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> body, HttpServletRequest request,
 			HttpServletResponse response) {
-		AuthenticatedUser user = authService.googleLogin(body.get("accessToken"));
+		AuthenticatedUser user = authService.googleLogin(body.get("credential"));
 
 		establishSession(user, request, response);
 
