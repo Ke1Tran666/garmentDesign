@@ -27,6 +27,9 @@ import com.garmentDesign.service.OtpService;
 import com.garmentDesign.service.PasswordService;
 import com.garmentDesign.service.UserStatusService;
 
+import java.time.format.DateTimeParseException;
+import java.util.List;
+
 import java.util.Locale;
 
 @Service
@@ -163,42 +166,67 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	@Transactional
-	public AuthenticatedUser login(String email, String password) {
+	public AuthenticatedUser login(
+	        String email,
+	        String password
+	) {
+	    String normalizedEmail = normalizeEmail(email);
 
-		String normalizedEmail = normalizeEmail(email);
+	    if (password == null || password.isBlank()) {
+	        throw new RuntimeException(
+	                "Mật khẩu không được để trống"
+	        );
+	    }
 
-		if (password == null || password.isBlank()) {
-			throw new RuntimeException("Mật khẩu không được để trống");
-		}
+	    UserAuthProvider auth = authProviderRepository
+	            .findByEmailAndProviderAndDeletedAtIsNull(
+	                    normalizedEmail,
+	                    "local"
+	            )
+	            .orElseThrow(
+	                    () -> new RuntimeException(
+	                            "Email hoặc mật khẩu không đúng"
+	                    )
+	            );
 
-		UserAuthProvider auth = authProviderRepository
-				.findByEmailAndProviderAndDeletedAtIsNull(normalizedEmail, "local")
-				.orElseThrow(() -> new RuntimeException("Email hoặc mật khẩu không đúng"));
+	    String storedPassword = auth.getPassword();
 
-		User user = auth.getUser();
+	    /*
+	     * Luôn kiểm tra mật khẩu trước trạng thái tài khoản.
+	     * Tránh làm lộ trạng thái của tài khoản khi người dùng
+	     * chưa nhập đúng mật khẩu.
+	     */
+	    if (!passwordService.matches(
+	            password,
+	            storedPassword
+	    )) {
+	        throw new RuntimeException(
+	                "Email hoặc mật khẩu không đúng"
+	        );
+	    }
 
-		/*
-		 * Chỉ chặn inactive, banned và delete. pending vẫn được đăng nhập.
-		 */
-		validateUserStatus(user);
+	    User user = auth.getUser();
 
-		String storedPassword = auth.getPassword();
+	    /*
+	     * Chặn inactive, banned, delete.
+	     * Pending vẫn được đăng nhập.
+	     */
+	    validateUserStatus(user);
 
-		if (!passwordService.matches(password, storedPassword)) {
+	    /*
+	     * Tự động chuyển mật khẩu plaintext cũ sang BCrypt.
+	     */
+	    if (passwordService.needsUpgrade(storedPassword)) {
+	        auth.setPassword(
+	                passwordService.encode(password)
+	        );
 
-			throw new RuntimeException("Email hoặc mật khẩu không đúng");
-		}
+	        auth.setUpdatedAt(LocalDateTime.now());
 
-		if (passwordService.needsUpgrade(storedPassword)) {
+	        authProviderRepository.save(auth);
+	    }
 
-			auth.setPassword(passwordService.encode(password));
-
-			auth.setUpdatedAt(LocalDateTime.now());
-
-			authProviderRepository.save(auth);
-		}
-
-		return createLoginResult(user);
+	    return createLoginResult(user);
 	}
 
 	@Override
@@ -321,47 +349,100 @@ public class AuthServiceImpl implements AuthService {
 	@Transactional
 	public Map<String, Object> register(String email, String password, String fullName, String gender,
 			String birthday) {
-
 		String normalizedEmail = normalizeEmail(email);
 
 		passwordService.validateNewPassword(password);
 
-		UserAuthProvider existingAuth = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
+		if (fullName == null || fullName.isBlank()) {
+			throw new RuntimeException("Họ và tên không được để trống");
+		}
+
+		String normalizedFullName = fullName.trim();
+
+		/*
+		 * Kiểm tra email trên tất cả provider.
+		 *
+		 * Không được tự liên kết local vào tài khoản Google tại đây vì người đăng ký
+		 * chưa chứng minh họ sở hữu tài khoản Google/email đó.
+		 */
+		List<UserAuthProvider> existingProviders = authProviderRepository.findAllByEmailIgnoreCase(normalizedEmail);
+
+		UserAuthProvider activeProvider = existingProviders.stream().filter(provider -> provider.getDeletedAt() == null)
+				.filter(provider -> provider.getUser() != null)
+				.filter(provider -> !"delete".equalsIgnoreCase(provider.getUser().getStatus())).findFirst()
 				.orElse(null);
 
-		if (existingAuth != null) {
-			User existingUser = existingAuth.getUser();
-
-			if ("delete".equalsIgnoreCase(existingUser.getStatus())) {
+		if (activeProvider != null) {
+			if ("google".equalsIgnoreCase(activeProvider.getProvider())) {
 				throw new RuntimeException(
-						"Email này thuộc tài khoản đã bị xóa. Nếu muốn khôi phục vui lòng liên hệ hotline để được hỗ trợ.");
+						"Email này đã được đăng ký bằng Google. " + "Vui lòng sử dụng nút đăng nhập Google.");
 			}
 
 			throw new RuntimeException("Email đã tồn tại");
 		}
 
+		/*
+		 * Email từng thuộc tài khoản bị xóa hoặc provider đã bị xóa mềm.
+		 */
+		if (!existingProviders.isEmpty()) {
+			throw new RuntimeException("Email này thuộc tài khoản đã bị xóa. "
+					+ "Nếu muốn khôi phục, vui lòng liên hệ hotline để được hỗ trợ.");
+		}
+
+		/*
+		 * Gender không bắt buộc.
+		 */
+		String normalizedGender;
+
+		if (gender == null || gender.isBlank()) {
+			normalizedGender = "Unknown";
+		} else {
+			normalizedGender = gender.trim();
+
+			boolean validGender = "Male".equalsIgnoreCase(normalizedGender)
+					|| "Female".equalsIgnoreCase(normalizedGender) || "Unknown".equalsIgnoreCase(normalizedGender);
+
+			if (!validGender) {
+				throw new RuntimeException("Giới tính không hợp lệ");
+			}
+
+			if ("Male".equalsIgnoreCase(normalizedGender)) {
+				normalizedGender = "Male";
+			} else if ("Female".equalsIgnoreCase(normalizedGender)) {
+				normalizedGender = "Female";
+			} else {
+				normalizedGender = "Unknown";
+			}
+		}
+
+		/*
+		 * Birthday không bắt buộc.
+		 */
+		LocalDate parsedBirthday = null;
+
+		if (birthday != null && !birthday.isBlank()) {
+			try {
+				parsedBirthday = LocalDate.parse(birthday.trim());
+			} catch (DateTimeParseException exception) {
+				throw new RuntimeException("Ngày sinh không hợp lệ. Định dạng yêu cầu là yyyy-MM-dd");
+			}
+
+			if (parsedBirthday.isAfter(LocalDate.now())) {
+				throw new RuntimeException("Ngày sinh không được lớn hơn ngày hiện tại");
+			}
+		}
+
 		String idUser = generateRandom5Number();
-		String prefixName = generateNameCode(fullName);
+		String prefixName = generateNameCode(normalizedFullName);
 
-		String genderCode;
+		String genderCode = switch (normalizedGender) {
+		case "Male" -> "M";
+		case "Female" -> "F";
+		default -> "U";
+		};
 
-		switch (gender.toLowerCase()) {
-		case "male":
-			genderCode = "M";
-			break;
-		case "female":
-			genderCode = "F";
-			break;
-		default:
-			genderCode = "U";
-			break;
-		}
-
-		String yearCode = "00";
-
-		if (birthday != null && !birthday.isEmpty()) {
-			yearCode = birthday.substring(2, 4);
-		}
+		String yearCode = parsedBirthday == null ? "00"
+				: String.format(Locale.ROOT, "%02d", parsedBirthday.getYear() % 100);
 
 		String userCode = prefixName + genderCode + yearCode + idUser;
 
@@ -370,31 +451,24 @@ public class AuthServiceImpl implements AuthService {
 		User user = new User();
 		user.setIdUser(idUser);
 		user.setUserCode(userCode);
-		user.setFullName(fullName);
-		user.setGender(gender);
-
-		if (birthday != null && !birthday.isEmpty()) {
-			user.setBirthday(LocalDate.parse(birthday));
-		}
-
+		user.setFullName(normalizedFullName);
+		user.setGender(normalizedGender);
+		user.setBirthday(parsedBirthday);
 		user.setStatus("pending");
 		user.setRole(userRole);
 
 		user = userRepository.save(user);
 
-		UserAuthProvider auth = new UserAuthProvider();
-		auth.setUser(user);
-		auth.setProvider("local");
-		auth.setEmail(normalizedEmail);
-		auth.setEmailVerifiedAt(null);
-		auth.setPassword(passwordService.encode(password));
+		UserAuthProvider localProvider = new UserAuthProvider();
+		localProvider.setUser(user);
+		localProvider.setProvider("local");
+		localProvider.setEmail(normalizedEmail);
+		localProvider.setEmailVerifiedAt(null);
+		localProvider.setPassword(passwordService.encode(password));
 
-		authProviderRepository.save(auth);
+		authProviderRepository.save(localProvider);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("message", "Đăng ký thành công");
-
-		return result;
+		return Map.of("message", "Đăng ký thành công");
 	}
 
 	@Override
