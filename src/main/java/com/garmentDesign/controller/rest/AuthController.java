@@ -13,7 +13,6 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,27 +24,28 @@ import com.garmentDesign.dto.auth.CurrentUserResponse;
 import com.garmentDesign.entity.User;
 import com.garmentDesign.service.AuthService;
 import com.garmentDesign.service.UserService;
+import com.garmentDesign.service.UserSessionService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
-import com.garmentDesign.service.UserSessionService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
+	private final UserService service;
 	private final AuthService authService;
-	private final UserService userService;
 	private final UserSessionService userSessionService;
 
 	private final SecurityContextRepository securityContextRepository;
 
-	public AuthController(AuthService authService, UserService userService,
+	public AuthController(AuthService authService, UserService service,
 			SecurityContextRepository securityContextRepository, UserSessionService userSessionService) {
 		this.authService = authService;
-		this.userService = userService;
+		this.service = service;
 		this.securityContextRepository = securityContextRepository;
 		this.userSessionService = userSessionService;
 	}
@@ -125,16 +125,6 @@ public class AuthController {
 		return ResponseEntity.ok(Map.of("message", "Xác thực số điện thoại thành công"));
 	}
 
-	@PostMapping("/send-email-otp")
-	public ResponseEntity<?> sendEmailOtp(@RequestBody Map<String, String> body) {
-		return ResponseEntity.ok(authService.sendEmailOtp(body.get("email")));
-	}
-
-	@PostMapping("/verify-email-otp")
-	public ResponseEntity<?> verifyEmailOtp(@RequestBody Map<String, String> body) {
-		return ResponseEntity.ok(authService.verifyEmailOtp(body.get("email"), body.get("otp")));
-	}
-
 	@PostMapping("/register")
 	public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
 		return ResponseEntity.ok(authService.register(body.get("email"), body.get("password"), body.get("fullName"),
@@ -181,8 +171,29 @@ public class AuthController {
 			return ResponseEntity.noContent().build();
 		}
 
-		User user = userService.findById(authentication.getName());
+		User user = service.findById(authentication.getName());
 
 		return ResponseEntity.ok(CurrentUserResponse.from(user));
+	}
+
+	@PostMapping("/me/email/send-otp")
+	public ResponseEntity<?> sendMyEmailOtp(Authentication authentication) {
+		return ResponseEntity.ok(authService.sendMyEmailOtp(authentication.getName()));
+	}
+
+	@PostMapping("/me/email/verify-otp")
+	public ResponseEntity<?> verifyMyEmailOtp(Authentication authentication, @RequestBody Map<String, String> body) {
+		return ResponseEntity.ok(authService.verifyMyEmailOtp(authentication.getName(), body.get("otp")));
+	}
+	
+	@DeleteMapping("/me/email/verification")
+	public ResponseEntity<?> removeMyEmailVerification(
+			Authentication authentication
+	) {
+		return ResponseEntity.ok(
+				authService.removeMyEmailVerification(
+						authentication.getName()
+				)
+		);
 	}
 }

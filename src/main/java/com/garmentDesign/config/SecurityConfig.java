@@ -96,8 +96,7 @@ public class SecurityConfig {
 						 * Endpoint xác thực công khai
 						 */
 						.requestMatchers("/api/auth/login", "/api/auth/send-otp", "/api/auth/verify-otp",
-								"/api/auth/google-login", "/api/auth/register", "/api/auth/send-email-otp",
-								"/api/auth/verify-email-otp", "/api/auth/forgot-password",
+								"/api/auth/google-login", "/api/auth/register", "/api/auth/forgot-password",
 								"/api/auth/verify-forgot-otp", "/api/auth/reset-password", "/api/auth/csrf",
 								"/api/auth/me", "/uploads/**")
 						.permitAll()
