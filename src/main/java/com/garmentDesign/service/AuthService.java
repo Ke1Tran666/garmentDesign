@@ -22,7 +22,7 @@ public interface AuthService {
 
 	Map<String, Object> resetPassword(String email, String newPassword);
 
-	AuthenticatedUser googleLogin(String accessToken);
+	AuthenticatedUser googleLogin(String credential);
 
 	Map<String, Object> register(String email, String password, String fullName, String gender, String birthday);
 }

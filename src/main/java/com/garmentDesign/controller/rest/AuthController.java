@@ -141,7 +141,7 @@ public class AuthController {
 	@PostMapping("/google-login")
 	public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> body, HttpServletRequest request,
 			HttpServletResponse response) {
-		AuthenticatedUser user = authService.googleLogin(body.get("accessToken"));
+		AuthenticatedUser user = authService.googleLogin(body.get("credential"));
 
 		establishSession(user, request, response);
 
