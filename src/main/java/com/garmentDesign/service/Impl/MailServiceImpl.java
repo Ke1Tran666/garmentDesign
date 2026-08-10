@@ -366,7 +366,7 @@ public class MailServiceImpl implements MailService {
 					                    color:#6b7280;
 					                    line-height:1.7;
 					                ">
-					                    Mã có hiệu lực trong 5 phút.<br>
+					                    Mã có hiệu lực trong 3 phút.<br>
 					                    Bạn có tối đa 5 lần nhập sai.
 					                </p>
 

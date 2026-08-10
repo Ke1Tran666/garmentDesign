@@ -32,6 +32,8 @@ import java.util.List;
 
 import java.util.Locale;
 
+import com.garmentDesign.service.UserSessionService;
+
 @Service
 public class AuthServiceImpl implements AuthService {
 
@@ -42,13 +44,15 @@ public class AuthServiceImpl implements AuthService {
 	private final PasswordService passwordService;
 	private final UserStatusService userStatusService;
 	private final GoogleIdTokenVerifier googleIdTokenVerifier;
+	private final UserSessionService userSessionService;
 
 	private static final String VERIFY_EMAIL_OTP = "verify-email";
 	private static final String RESET_PASSWORD_OTP = "reset-password";
 
 	public AuthServiceImpl(UserAuthProviderRepository authProviderRepository, UserRepository userRepository,
 			RoleRepository roleRepository, OtpService otpService, PasswordService passwordService,
-			UserStatusService userStatusService, GoogleIdTokenVerifier googleIdTokenVerifier) {
+			UserStatusService userStatusService, GoogleIdTokenVerifier googleIdTokenVerifier,
+			UserSessionService userSessionService) {
 		this.authProviderRepository = authProviderRepository;
 		this.userRepository = userRepository;
 		this.roleRepository = roleRepository;
@@ -56,6 +60,7 @@ public class AuthServiceImpl implements AuthService {
 		this.passwordService = passwordService;
 		this.userStatusService = userStatusService;
 		this.googleIdTokenVerifier = googleIdTokenVerifier;
+		this.userSessionService = userSessionService;
 	}
 
 	private String normalizeEmail(String email) {
@@ -99,6 +104,28 @@ public class AuthServiceImpl implements AuthService {
 		}
 
 		return new AuthenticatedUser(user.getIdUser(), user.getRole().getNameRole());
+	}
+
+	private User createPendingGoogleUser(String fullName) {
+		String idUser = generateRandom5Number();
+		String prefixName = generateNameCode(fullName);
+		String userCode = prefixName + "U00" + idUser;
+
+		Role userRole = roleRepository.findById(3L).orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
+
+		User user = new User();
+		user.setIdUser(idUser);
+		user.setUserCode(userCode);
+		user.setFullName(fullName);
+		user.setGender("Unknown");
+
+		/*
+		 * Google đã xác thực email, nhưng tài khoản vẫn chưa đủ hồ sơ và địa chỉ.
+		 */
+		user.setStatus("pending");
+		user.setRole(userRole);
+
+		return userRepository.save(user);
 	}
 
 	private String removeVietnameseAccent(String value) {
@@ -164,69 +191,59 @@ public class AuthServiceImpl implements AuthService {
 		return user;
 	}
 
+	private UserAuthProvider getActiveLocalProviderForReset(String normalizedEmail) {
+		UserAuthProvider auth = authProviderRepository
+				.findByEmailAndProviderAndDeletedAtIsNull(normalizedEmail, "local")
+				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+
+		User user = auth.getUser();
+
+		validateUserStatus(user);
+
+		if (!"active".equalsIgnoreCase(user.getStatus())) {
+			throw new RuntimeException("Tính năng quên mật khẩu chỉ áp dụng " + "cho tài khoản đã kích hoạt.");
+		}
+
+		return auth;
+	}
+
 	@Override
 	@Transactional
-	public AuthenticatedUser login(
-	        String email,
-	        String password
-	) {
-	    String normalizedEmail = normalizeEmail(email);
+	public AuthenticatedUser login(String email, String password) {
 
-	    if (password == null || password.isBlank()) {
-	        throw new RuntimeException(
-	                "Mật khẩu không được để trống"
-	        );
-	    }
+		String normalizedEmail = normalizeEmail(email);
 
-	    UserAuthProvider auth = authProviderRepository
-	            .findByEmailAndProviderAndDeletedAtIsNull(
-	                    normalizedEmail,
-	                    "local"
-	            )
-	            .orElseThrow(
-	                    () -> new RuntimeException(
-	                            "Email hoặc mật khẩu không đúng"
-	                    )
-	            );
+		if (password == null || password.isBlank()) {
+			throw new RuntimeException("Mật khẩu không được để trống");
+		}
 
-	    String storedPassword = auth.getPassword();
+		UserAuthProvider auth = authProviderRepository
+				.findByEmailAndProviderAndDeletedAtIsNull(normalizedEmail, "local")
+				.orElseThrow(() -> new RuntimeException("Email hoặc mật khẩu không đúng"));
 
-	    /*
-	     * Luôn kiểm tra mật khẩu trước trạng thái tài khoản.
-	     * Tránh làm lộ trạng thái của tài khoản khi người dùng
-	     * chưa nhập đúng mật khẩu.
-	     */
-	    if (!passwordService.matches(
-	            password,
-	            storedPassword
-	    )) {
-	        throw new RuntimeException(
-	                "Email hoặc mật khẩu không đúng"
-	        );
-	    }
+		String storedPassword = auth.getPassword();
 
-	    User user = auth.getUser();
+		if (!passwordService.matches(password, storedPassword)) {
+			throw new RuntimeException("Email hoặc mật khẩu không đúng");
+		}
 
-	    /*
-	     * Chặn inactive, banned, delete.
-	     * Pending vẫn được đăng nhập.
-	     */
-	    validateUserStatus(user);
+		User user = auth.getUser();
 
-	    /*
-	     * Tự động chuyển mật khẩu plaintext cũ sang BCrypt.
-	     */
-	    if (passwordService.needsUpgrade(storedPassword)) {
-	        auth.setPassword(
-	                passwordService.encode(password)
-	        );
+		/*
+		 * Chỉ trả trạng thái tài khoản sau khi mật khẩu đúng.
+		 */
+		validateUserStatus(user);
 
-	        auth.setUpdatedAt(LocalDateTime.now());
+		if (passwordService.needsUpgrade(storedPassword)) {
 
-	        authProviderRepository.save(auth);
-	    }
+			auth.setPassword(passwordService.encode(password));
 
-	    return createLoginResult(user);
+			auth.setUpdatedAt(LocalDateTime.now());
+
+			authProviderRepository.save(auth);
+		}
+
+		return createLoginResult(user);
 	}
 
 	@Override
@@ -473,20 +490,9 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	public Map<String, Object> forgotPassword(String email) {
-
 		String normalizedEmail = normalizeEmail(email);
 
-		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
-				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
-
-		User user = auth.getUser();
-
-		validateUserStatus(user);
-
-		if (!"active".equalsIgnoreCase(user.getStatus())) {
-
-			throw new RuntimeException("Tính năng quên mật khẩu chỉ áp dụng " + "cho tài khoản đã kích hoạt.");
-		}
+		getActiveLocalProviderForReset(normalizedEmail);
 
 		otpService.sendOtp(normalizedEmail, RESET_PASSWORD_OTP);
 
@@ -495,72 +501,60 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	public Map<String, Object> verifyForgotOtp(String email, String otp) {
-
 		String normalizedEmail = normalizeEmail(email);
 
 		if (otp == null || otp.isBlank()) {
 			throw new RuntimeException("OTP không được để trống");
 		}
 
-		authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
-				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+		/*
+		 * Kiểm tra lại trạng thái vì tài khoản có thể đã bị khóa sau lúc gửi OTP.
+		 */
+		getActiveLocalProviderForReset(normalizedEmail);
 
 		otpService.verifyOtp(normalizedEmail, RESET_PASSWORD_OTP, otp.trim());
 
-		otpService.markVerified(normalizedEmail, RESET_PASSWORD_OTP);
+		String resetToken = otpService.createVerificationToken(normalizedEmail, RESET_PASSWORD_OTP);
 
 		otpService.clearOtp(normalizedEmail, RESET_PASSWORD_OTP);
 
-		return Map.of("message", "Xác thực OTP thành công");
+		return Map.of("message", "Xác thực OTP thành công", "resetToken", resetToken);
 	}
 
 	@Override
 	@Transactional
-	public Map<String, Object> resetPassword(String email, String newPassword) {
-
+	public Map<String, Object> resetPassword(String email, String newPassword, String resetToken) {
 		String normalizedEmail = normalizeEmail(email);
 
 		passwordService.validateNewPassword(newPassword);
 
-		if (!otpService.isVerified(normalizedEmail, RESET_PASSWORD_OTP)) {
+		/*
+		 * Kiểm tra trạng thái lần cuối trước khi đổi mật khẩu.
+		 */
+		UserAuthProvider auth = getActiveLocalProviderForReset(normalizedEmail);
 
-			throw new RuntimeException("Bạn chưa xác thực OTP hoặc phiên đã hết hạn");
+		boolean validResetToken = otpService.consumeVerificationToken(normalizedEmail, RESET_PASSWORD_OTP, resetToken);
+
+		if (!validResetToken) {
+			throw new RuntimeException("Phiên đổi mật khẩu không hợp lệ " + "hoặc đã hết hạn");
 		}
-
-		UserAuthProvider auth = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
-				.orElseThrow(() -> new RuntimeException("Email không tồn tại"));
 
 		auth.setPassword(passwordService.encode(newPassword));
 
 		auth.setUpdatedAt(LocalDateTime.now());
 
-		authProviderRepository.save(auth);
-
-		otpService.clearVerified(normalizedEmail, RESET_PASSWORD_OTP);
-
-		return Map.of("message", "Đổi mật khẩu thành công");
-	}
-
-	private User createPendingGoogleUser(String fullName) {
-		String idUser = generateRandom5Number();
-		String prefixName = generateNameCode(fullName);
-		String userCode = prefixName + "U00" + idUser;
-
-		Role userRole = roleRepository.findById(3L).orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
-
-		User user = new User();
-		user.setIdUser(idUser);
-		user.setUserCode(userCode);
-		user.setFullName(fullName);
-		user.setGender("Unknown");
+		/*
+		 * Flush mật khẩu mới xuống database trước khi vô hiệu hóa các session.
+		 */
+		authProviderRepository.saveAndFlush(auth);
 
 		/*
-		 * Google đã xác thực email, nhưng tài khoản vẫn chưa đủ hồ sơ và địa chỉ.
+		 * Mọi JSESSIONID của người dùng sẽ bị đánh dấu hết hạn. Request tiếp theo từ
+		 * các thiết bị cũ sẽ nhận HTTP 401.
 		 */
-		user.setStatus("pending");
-		user.setRole(userRole);
+		userSessionService.expireAllSessions(auth.getUser().getIdUser());
 
-		return userRepository.save(user);
+		return Map.of("message", "Đổi mật khẩu thành công. " + "Tất cả phiên đăng nhập cũ đã bị đăng xuất");
 	}
 
 	@Override

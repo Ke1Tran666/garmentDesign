@@ -20,7 +20,7 @@ public interface AuthService {
 
 	Map<String, Object> verifyForgotOtp(String email, String otp);
 
-	Map<String, Object> resetPassword(String email, String newPassword);
+	Map<String, Object> resetPassword(String email, String newPassword, String resetToken);
 
 	AuthenticatedUser googleLogin(String credential);
 
