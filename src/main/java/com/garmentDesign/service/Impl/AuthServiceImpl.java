@@ -207,6 +207,73 @@ public class AuthServiceImpl implements AuthService {
 		return auth;
 	}
 
+	private UserAuthProvider getMyActiveLocalProvider(String idUser) {
+		if (idUser == null || idUser.isBlank()) {
+			throw new RuntimeException("Bạn chưa đăng nhập");
+		}
+
+		UserAuthProvider provider = authProviderRepository
+				.findByUser_IdUserAndProviderAndDeletedAtIsNull(idUser, "local")
+				.orElseThrow(() -> new RuntimeException("Tài khoản hiện tại không có email đăng nhập local"));
+
+		User user = provider.getUser();
+
+		validateUserStatus(user);
+
+		if (provider.getEmail() == null || provider.getEmail().isBlank()) {
+			throw new RuntimeException("Tài khoản local chưa có địa chỉ email");
+		}
+
+		return provider;
+	}
+
+	@Override
+	public Map<String, Object> sendMyEmailOtp(String idUser) {
+		UserAuthProvider provider = getMyActiveLocalProvider(idUser);
+
+		if (provider.getEmailVerifiedAt() != null) {
+			throw new RuntimeException("Email đã được xác thực");
+		}
+
+		String normalizedEmail = normalizeEmail(provider.getEmail());
+
+		otpService.sendOtp(normalizedEmail, VERIFY_EMAIL_OTP);
+
+		return Map.of("message", "Mã OTP đã được gửi đến email của bạn");
+	}
+
+	@Override
+	@Transactional
+	public Map<String, Object> verifyMyEmailOtp(String idUser, String otp) {
+		if (otp == null || otp.isBlank()) {
+			throw new RuntimeException("Vui lòng nhập mã OTP");
+		}
+
+		UserAuthProvider provider = getMyActiveLocalProvider(idUser);
+
+		if (provider.getEmailVerifiedAt() != null) {
+			return Map.of("message", "Email đã được xác thực trước đó", "status", provider.getUser().getStatus());
+		}
+
+		String normalizedEmail = normalizeEmail(provider.getEmail());
+
+		otpService.verifyOtp(normalizedEmail, VERIFY_EMAIL_OTP, otp.trim());
+
+		LocalDateTime verifiedAt = LocalDateTime.now();
+
+		provider.setEmailVerifiedAt(verifiedAt);
+		provider.setUpdatedAt(verifiedAt);
+
+		authProviderRepository.save(provider);
+
+		User refreshedUser = userStatusService.refreshStatus(provider.getUser());
+
+		otpService.clearOtp(normalizedEmail, VERIFY_EMAIL_OTP);
+
+		return Map.of("message", "Xác thực email thành công", "emailVerifiedAt", verifiedAt, "status",
+				refreshedUser.getStatus());
+	}
+
 	@Override
 	@Transactional
 	public AuthenticatedUser login(String email, String password) {
@@ -316,50 +383,6 @@ public class AuthServiceImpl implements AuthService {
 		otpService.clearOtp(normalizedPhone, "phone");
 
 		return createLoginResult(user);
-	}
-
-	@Override
-	public Map<String, Object> sendEmailOtp(String email) {
-		String normalizedEmail = normalizeEmail(email);
-
-		authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
-				.orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản local với email này"));
-
-		otpService.sendOtp(normalizedEmail, VERIFY_EMAIL_OTP);
-
-		return Map.of("message", "Đã gửi OTP xác thực email");
-	}
-
-	@Override
-	@Transactional
-	public Map<String, Object> verifyEmailOtp(String email, String otp) {
-
-		String normalizedEmail = normalizeEmail(email);
-
-		if (otp == null || otp.isBlank()) {
-			throw new RuntimeException("OTP không được để trống");
-		}
-
-		UserAuthProvider provider = authProviderRepository.findByEmailAndProvider(normalizedEmail, "local")
-				.orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản local"));
-
-		otpService.verifyOtp(normalizedEmail, VERIFY_EMAIL_OTP, otp.trim());
-
-		User user = provider.getUser();
-
-		validateUserStatus(user);
-
-		provider.setDeletedAt(null);
-		provider.setEmailVerifiedAt(LocalDateTime.now());
-		provider.setUpdatedAt(LocalDateTime.now());
-
-		authProviderRepository.save(provider);
-
-		userStatusService.refreshStatus(user);
-
-		otpService.clearOtp(normalizedEmail, VERIFY_EMAIL_OTP);
-
-		return Map.of("message", "Xác thực email thành công");
 	}
 
 	@Override
@@ -691,5 +714,49 @@ public class AuthServiceImpl implements AuthService {
 		userStatusService.refreshStatus(user);
 
 		return createLoginResult(user);
+	}
+	
+	@Override
+	@Transactional
+	public Map<String, Object> removeMyEmailVerification(
+			String idUser
+	) {
+		UserAuthProvider provider =
+				getMyActiveLocalProvider(idUser);
+
+		String normalizedEmail =
+				normalizeEmail(provider.getEmail());
+
+		/*
+		 * Hủy luôn OTP xác thực đang tồn tại.
+		 */
+		otpService.clearOtp(
+				normalizedEmail,
+				VERIFY_EMAIL_OTP
+		);
+
+		if (provider.getEmailVerifiedAt() == null) {
+			return Map.of(
+					"message", "Email hiện chưa được xác thực",
+					"status", provider.getUser().getStatus()
+			);
+		}
+
+		LocalDateTime now = LocalDateTime.now();
+
+		provider.setEmailVerifiedAt(null);
+		provider.setUpdatedAt(now);
+
+		authProviderRepository.save(provider);
+
+		User refreshedUser =
+				userStatusService.refreshStatus(
+						provider.getUser()
+				);
+
+		return Map.of(
+				"message", "Đã bỏ xác thực email",
+				"status", refreshedUser.getStatus()
+		);
 	}
 }

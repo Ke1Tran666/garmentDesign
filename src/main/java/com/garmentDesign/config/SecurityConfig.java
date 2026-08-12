@@ -24,6 +24,9 @@ import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 
+import java.util.Arrays;
+import org.springframework.beans.factory.annotation.Value;
+
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -42,11 +45,20 @@ public class SecurityConfig {
 	public CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
 
-		configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+		configuration.setAllowedOrigins(
+			    Arrays.stream(allowedOrigins.split(","))
+			        .map(String::trim)
+			        .filter(origin -> !origin.isBlank())
+			        .toList()
+			);
 
-		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+		configuration.setAllowedMethods(
+			    List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+			);
 
-		configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN"));
+		configuration.setAllowedHeaders(
+			    List.of("Content-Type", "X-XSRF-TOKEN", "Accept")
+			);
 
 		configuration.setAllowCredentials(true);
 
@@ -96,8 +108,7 @@ public class SecurityConfig {
 						 * Endpoint xác thực công khai
 						 */
 						.requestMatchers("/api/auth/login", "/api/auth/send-otp", "/api/auth/verify-otp",
-								"/api/auth/google-login", "/api/auth/register", "/api/auth/send-email-otp",
-								"/api/auth/verify-email-otp", "/api/auth/forgot-password",
+								"/api/auth/google-login", "/api/auth/register", "/api/auth/forgot-password",
 								"/api/auth/verify-forgot-otp", "/api/auth/reset-password", "/api/auth/csrf",
 								"/api/auth/me", "/uploads/**")
 						.permitAll()
@@ -181,4 +192,7 @@ public class SecurityConfig {
 	public HttpSessionEventPublisher httpSessionEventPublisher() {
 		return new HttpSessionEventPublisher();
 	}
+	
+	@Value("${app.cors.allowed-origins:http://localhost:5173}")
+	private String allowedOrigins;
 }

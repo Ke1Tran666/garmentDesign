@@ -40,39 +40,42 @@ public class UserStatusServiceImpl implements UserStatusService {
 	@Transactional
 	public User refreshStatus(User user) {
 		if (user == null) {
-			throw new RuntimeException("Không tìm thấy người dùng");
+			throw new RuntimeException(
+					"Không tìm thấy người dùng"
+			);
 		}
 
 		String currentStatus = user.getStatus();
 
-		/*
-		 * Không tự động mở lại tài khoản do quản trị viên khóa/ngừng hoặc đã xóa.
-		 */
-		if ("inactive".equalsIgnoreCase(currentStatus) || "banned".equalsIgnoreCase(currentStatus)
+		if ("inactive".equalsIgnoreCase(currentStatus)
+				|| "banned".equalsIgnoreCase(currentStatus)
 				|| "delete".equalsIgnoreCase(currentStatus)) {
+
 			return user;
 		}
 
-		boolean hasFullName = user.getFullName() != null && !user.getFullName().trim().isEmpty();
+		boolean hasVerifiedContact =
+				authProviderRepository
+						.findByUser_IdUserAndDeletedAtIsNull(
+								user.getIdUser()
+						)
+						.stream()
+						.anyMatch(provider ->
+								provider.getEmailVerifiedAt() != null
+								|| provider.getPhoneVerifiedAt() != null
+						);
 
-		boolean hasBirthday = user.getBirthday() != null;
+		boolean hasAddress =
+				addressRepository
+						.existsByUser_IdUserAndDeletedAtIsNull(
+								user.getIdUser()
+						);
 
-		boolean hasGender = user.getGender() != null && !user.getGender().isBlank()
-				&& !"Unknown".equalsIgnoreCase(user.getGender());
-
-		boolean hasProfileInfo = hasFullName && hasBirthday && hasGender;
-
-		boolean hasVerifiedContact = authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
-				.stream()
-				.anyMatch(provider -> provider.getEmailVerifiedAt() != null || provider.getPhoneVerifiedAt() != null);
-
-		boolean hasAddress = addressRepository.existsByUser_IdUserAndDeletedAtIsNull(user.getIdUser());
-
-		if (hasProfileInfo && hasVerifiedContact && hasAddress) {
-			user.setStatus("active");
-		} else {
-			user.setStatus("pending");
-		}
+		user.setStatus(
+				hasVerifiedContact && hasAddress
+						? "active"
+						: "pending"
+		);
 
 		user.setUpdatedAt(LocalDateTime.now());
 
