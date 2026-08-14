@@ -1,0 +1,173 @@
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mindex 667aaef..6280edf 100644[m
+[1m--- a/.gitignore[m
+[1m+++ b/.gitignore[m
+[36m@@ -31,3 +31,6 @@[m [mbuild/[m
+ [m
+ ### VS Code ###[m
+ .vscode/[m
+[32m+[m
+[32m+[m[32muploads/[m
+[32m+[m[32msrc/main/resources/application-local.properties[m
+\ No newline at end of file[m
+[1mdiff --git a/src/main/java/com/garmentDesign/config/SecurityConfig.java b/src/main/java/com/garmentDesign/config/SecurityConfig.java[m
+[1mindex 723b751..d2960c9 100644[m
+[1m--- a/src/main/java/com/garmentDesign/config/SecurityConfig.java[m
+[1m+++ b/src/main/java/com/garmentDesign/config/SecurityConfig.java[m
+[36m@@ -24,6 +24,9 @@[m [mimport org.springframework.security.core.session.SessionRegistry;[m
+ import org.springframework.security.core.session.SessionRegistryImpl;[m
+ import org.springframework.security.web.session.HttpSessionEventPublisher;[m
+ [m
+[32m+[m[32mimport java.util.Arrays;[m
+[32m+[m[32mimport org.springframework.beans.factory.annotation.Value;[m
+[32m+[m
+ @Configuration[m
+ @EnableMethodSecurity[m
+ public class SecurityConfig {[m
+[36m@@ -42,11 +45,20 @@[m [mpublic class SecurityConfig {[m
+ 	public CorsConfigurationSource corsConfigurationSource() {[m
+ 		CorsConfiguration configuration = new CorsConfiguration();[m
+ [m
+[31m-		configuration.setAllowedOrigins(List.of("http://localhost:5173"));[m
+[32m+[m		[32mconfiguration.setAllowedOrigins([m
+[32m+[m			[32m    Arrays.stream(allowedOrigins.split(","))[m
+[32m+[m			[32m        .map(String::trim)[m
+[32m+[m			[32m        .filter(origin -> !origin.isBlank())[m
+[32m+[m			[32m        .toList()[m
+[32m+[m			[32m);[m
+ [m
+[31m-		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));[m
+[32m+[m		[32mconfiguration.setAllowedMethods([m
+[32m+[m			[32m    List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")[m
+[32m+[m			[32m);[m
+ [m
+[31m-		configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN"));[m
+[32m+[m		[32mconfiguration.setAllowedHeaders([m
+[32m+[m			[32m    List.of("Content-Type", "X-XSRF-TOKEN", "Accept")[m
+[32m+[m			[32m);[m
+ [m
+ 		configuration.setAllowCredentials(true);[m
+ [m
+[36m@@ -180,4 +192,7 @@[m [mpublic class SecurityConfig {[m
+ 	public HttpSessionEventPublisher httpSessionEventPublisher() {[m
+ 		return new HttpSessionEventPublisher();[m
+ 	}[m
+[32m+[m[41m	[m
+[32m+[m	[32m@Value("${app.cors.allowed-origins:http://localhost:5173}")[m
+[32m+[m	[32mprivate String allowedOrigins;[m
+ }[m
+\ No newline at end of file[m
+[1mdiff --git a/src/main/java/com/garmentDesign/config/WebConfig.java b/src/main/java/com/garmentDesign/config/WebConfig.java[m
+[1mindex 0271d49..c3e2e2c 100644[m
+[1m--- a/src/main/java/com/garmentDesign/config/WebConfig.java[m
+[1m+++ b/src/main/java/com/garmentDesign/config/WebConfig.java[m
+[36m@@ -1,5 +1,8 @@[m
+ package com.garmentDesign.config;[m
+ [m
+[32m+[m[32mimport java.nio.file.Path;[m
+[32m+[m
+[32m+[m[32mimport org.springframework.beans.factory.annotation.Value;[m
+ import org.springframework.context.annotation.Configuration;[m
+ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;[m
+ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;[m
+[36m@@ -7,9 +10,19 @@[m [mimport org.springframework.web.servlet.config.annotation.WebMvcConfigurer;[m
+ @Configuration[m
+ public class WebConfig implements WebMvcConfigurer {[m
+ [m
+[31m-	@Override[m
+[31m-	public void addResourceHandlers(ResourceHandlerRegistry registry) {[m
+[32m+[m[32m    @Value("${app.upload.root-dir:uploads}")[m
+[32m+[m[32m    private String uploadRoot;[m
+[32m+[m
+[32m+[m[32m    @Override[m
+[32m+[m[32m    public void addResourceHandlers(ResourceHandlerRegistry registry) {[m
+[32m+[m[32m        String uploadLocation = Path.of(uploadRoot)[m
+[32m+[m[32m                .toAbsolutePath()[m
+[32m+[m[32m                .normalize()[m
+[32m+[m[32m                .toUri()[m
+[32m+[m[32m                .toString();[m
+ [m
+[31m-		registry.addResourceHandler("/uploads/**").addResourceLocations("file:uploads/");[m
+[31m-	}[m
+[32m+[m[32m        registry[m
+[32m+[m[32m                .addResourceHandler("/uploads/**")[m
+[32m+[m[32m                .addResourceLocations(uploadLocation);[m
+[32m+[m[32m    }[m
+ }[m
+\ No newline at end of file[m
+[1mdiff --git a/src/main/resources/application.properties b/src/main/resources/application.properties[m
+[1mindex a6becd2..93877c3 100644[m
+[1m--- a/src/main/resources/application.properties[m
+[1m+++ b/src/main/resources/application.properties[m
+[36m@@ -1,52 +1,44 @@[m
+[31m-#server[m
+[31m-server.port=8082[m
+[32m+[m[32mserver.port=${SERVER_PORT:8082}[m
+ [m
+ spring.application.name=garmentDesign[m
+[31m-#sql server[m
+[31m-spring.datasource.url=jdbc:sqlserver://localhost\\SQLEXPRESS;databaseName=HoaTranmaymac;encrypt=true;trustServerCertificate=true[m
+[31m-spring.datasource.username=sa[m
+[31m-spring.datasource.password=123456789[m
+[32m+[m
+[32m+[m[32mspring.datasource.url=${SPRING_DATASOURCE_URL}[m
+[32m+[m[32mspring.datasource.username=${SPRING_DATASOURCE_USERNAME}[m
+[32m+[m[32mspring.datasource.password=${SPRING_DATASOURCE_PASSWORD}[m
+ spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver[m
+[32m+[m
+ spring.jpa.hibernate.ddl-auto=none[m
+[31m-spring.jpa.show-sql=true[m
+[32m+[m[32mspring.jpa.show-sql=${SPRING_JPA_SHOW_SQL:false}[m
+ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.SQLServerDialect[m
+ spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl[m
+ [m
+[31m-#time[m
+ spring.jackson.time-zone=Asia/Ho_Chi_Minh[m
+ [m
+[31m-#email[m
+ spring.mail.host=smtp.gmail.com[m
+ spring.mail.port=587[m
+[31m-spring.mail.username=hoatranmaymac@gmail.com[m
+[31m-spring.mail.password=gxyvxdzyrfzorwte[m
+[31m-[m
+[32m+[m[32mspring.mail.username=${SPRING_MAIL_USERNAME}[m
+[32m+[m[32mspring.mail.password=${SPRING_MAIL_PASSWORD}[m
+ spring.mail.properties.mail.smtp.auth=true[m
+ spring.mail.properties.mail.smtp.starttls.enable=true[m
+ spring.mail.properties.mail.smtp.starttls.required=true[m
+[31m-[m
+ spring.mail.properties.mail.smtp.connectiontimeout=5000[m
+ spring.mail.properties.mail.smtp.timeout=5000[m
+ spring.mail.properties.mail.smtp.writetimeout=5000[m
+ [m
+[31m-#file[m
+[31m-app.upload.service-order-dir=uploads/service-orders[m
+[31m-app.upload.avatar-dir=${AVATAR_UPLOAD_DIR:uploads/avatars}[m
+[32m+[m[32mapp.upload.root-dir=${UPLOAD_ROOT:uploads}[m
+[32m+[m[32mapp.upload.service-order-dir=${UPLOAD_ROOT:uploads}/service-orders[m
+[32m+[m[32mapp.upload.avatar-dir=${UPLOAD_ROOT:uploads}/avatars[m
+ app.public-base-url=${APP_PUBLIC_BASE_URL:http://localhost:8082}[m
+ [m
+[32m+[m[32mapp.cors.allowed-origins=${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}[m
+[32m+[m
+ spring.servlet.multipart.max-file-size=50MB[m
+ spring.servlet.multipart.max-request-size=200MB[m
+ [m
+[31m-[m
+[31m-#server 1[m
+ server.servlet.session.timeout=30m[m
+[31m-[m
+ server.servlet.session.cookie.name=JSESSIONID[m
+ server.servlet.session.cookie.http-only=true[m
+[31m-server.servlet.session.cookie.same-site=lax[m
+[31m-[m
+[31m-# Localhost chưa có HTTPS:[m
+[31m-server.servlet.session.cookie.secure=false[m
+[32m+[m[32mserver.servlet.session.cookie.same-site=${SESSION_COOKIE_SAME_SITE:lax}[m
+[32m+[m[32mserver.servlet.session.cookie.secure=${SESSION_COOKIE_SECURE:false}[m
+ [m
+[31m-# google[m
+[31m-app.google.client-id=${GOOGLE_CLIENT_ID:103100740133-m05hki7d1vls8ce0anbo8s857rjq7q1h.apps.googleusercontent.com}[m
+\ No newline at end of file[m
+[32m+[m[32mapp.google.client-id=${GOOGLE_CLIENT_ID}[m
+\ No newline at end of file[m
