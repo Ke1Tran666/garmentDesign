@@ -25,6 +25,6 @@ public interface AuthService {
 	AuthenticatedUser googleLogin(String credential);
 
 	Map<String, Object> register(String email, String password, String fullName, String gender, String birthday);
-	
+
 	Map<String, Object> removeMyEmailVerification(String idUser);
 }

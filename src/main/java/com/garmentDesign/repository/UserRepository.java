@@ -14,4 +14,6 @@ public interface UserRepository extends JpaRepository<User, String> {
 	boolean existsByUserCode(String userCode);
 
 	Optional<User> findByIdUserAndDeletedAtIsNull(String idUser);
+
+	boolean existsByUserCodeEndingWithIgnoreCase(String storageCode);
 }

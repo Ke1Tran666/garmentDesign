@@ -45,34 +45,22 @@ public class UserServiceImpl implements UserService {
 	private final UserAddressRepository addressRepository;
 	private final PasswordService passwordService;
 	private final UserStatusService userStatusService;
-	
-	private static final Logger LOGGER =
-			LoggerFactory.getLogger(UserServiceImpl.class);
 
-	private static final long MAX_AVATAR_SIZE =
-			5L * 1024L * 1024L;
+	private static final Logger LOGGER = LoggerFactory.getLogger(UserServiceImpl.class);
+
+	private static final long MAX_AVATAR_SIZE = 5L * 1024L * 1024L;
 
 	private static final int MAX_AVATAR_DIMENSION = 4096;
 
-	private static final Set<String> ALLOWED_AVATAR_CONTENT_TYPES =
-			Set.of(
-					"image/jpeg",
-					"image/png"
-			);
+	private static final Set<String> ALLOWED_AVATAR_CONTENT_TYPES = Set.of("image/jpeg", "image/png");
 
-	private final Path avatarDirectory;
+	private final Path uploadRoot;
 	private final String publicBaseUrl;
 
-	public UserServiceImpl(
-			UserRepository repository,
-			UserAuthProviderRepository authProviderRepository,
-			UserAddressRepository addressRepository,
-			PasswordService passwordService,
-			UserStatusService userStatusService,
-			@Value("${app.upload.avatar-dir:uploads/avatars}")
-			String avatarDirectory,
-			@Value("${app.public-base-url:http://localhost:8082}")
-			String publicBaseUrl) {
+	public UserServiceImpl(UserRepository repository, UserAuthProviderRepository authProviderRepository,
+			UserAddressRepository addressRepository, PasswordService passwordService,
+			UserStatusService userStatusService, @Value("${app.upload.root-dir:uploads}") String uploadRoot,
+			@Value("${app.public-base-url:http://localhost:8082}") String publicBaseUrl) {
 
 		this.repository = repository;
 		this.authProviderRepository = authProviderRepository;
@@ -80,167 +68,154 @@ public class UserServiceImpl implements UserService {
 		this.passwordService = passwordService;
 		this.userStatusService = userStatusService;
 
-		this.avatarDirectory = Path.of(avatarDirectory)
-				.toAbsolutePath()
-				.normalize();
+		this.uploadRoot = Path.of(uploadRoot).toAbsolutePath().normalize();
 
-		if (publicBaseUrl == null
-				|| publicBaseUrl.isBlank()) {
+		if (publicBaseUrl == null || publicBaseUrl.isBlank()) {
 
-			throw new IllegalStateException(
-					"APP_PUBLIC_BASE_URL chưa được cấu hình"
-			);
+			throw new IllegalStateException("APP_PUBLIC_BASE_URL chưa được cấu hình");
 		}
 
-		this.publicBaseUrl =
-				publicBaseUrl.trim().replaceAll("/+$", "");
+		this.publicBaseUrl = publicBaseUrl.trim().replaceAll("/+$", "");
 	}
-	
-	private String validateAvatarAndGetExtension(
-			MultipartFile file) {
+
+	private void createUnverifiedPhoneProvider(User user, String normalizedPhone) {
+
+		UserAuthProvider provider = new UserAuthProvider();
+
+		provider.setUser(user);
+		provider.setProvider("phone");
+		provider.setPhone(normalizedPhone);
+		provider.setPhoneVerifiedAt(null);
+		provider.setDeletedAt(null);
+
+		authProviderRepository.save(provider);
+	}
+
+	private void removeCurrentPhoneForReplacement(UserAuthProvider provider) {
+
+		if (provider.getPhoneVerifiedAt() != null) {
+			/*
+			 * Số đã xác thực: giữ lịch sử.
+			 */
+			LocalDateTime now = LocalDateTime.now();
+
+			provider.setDeletedAt(now);
+			provider.setUpdatedAt(now);
+
+			authProviderRepository.save(provider);
+		} else {
+			/*
+			 * Số chưa xác thực: xóa hoàn toàn.
+			 */
+			authProviderRepository.delete(provider);
+			authProviderRepository.flush();
+		}
+	}
+
+	private String validateAvatarAndGetExtension(MultipartFile file) {
 
 		if (file == null || file.isEmpty()) {
-			throw new RuntimeException(
-					"Vui lòng chọn ảnh đại diện"
-			);
+			throw new RuntimeException("Vui lòng chọn ảnh đại diện");
 		}
 
 		if (file.getSize() > MAX_AVATAR_SIZE) {
-			throw new RuntimeException(
-					"Ảnh đại diện không được vượt quá 5 MB"
-			);
+			throw new RuntimeException("Ảnh đại diện không được vượt quá 5 MB");
 		}
 
 		String contentType = file.getContentType();
 
-		if (contentType == null
-				|| !ALLOWED_AVATAR_CONTENT_TYPES.contains(
-						contentType.toLowerCase(Locale.ROOT)
-				)) {
+		if (contentType == null || !ALLOWED_AVATAR_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
 
-			throw new RuntimeException(
-					"Chỉ chấp nhận ảnh JPEG hoặc PNG"
-			);
+			throw new RuntimeException("Chỉ chấp nhận ảnh JPEG hoặc PNG");
 		}
 
-		try (
-				InputStream inputStream = file.getInputStream();
-				ImageInputStream imageInputStream =
-						ImageIO.createImageInputStream(inputStream)
-		) {
+		try (InputStream inputStream = file.getInputStream();
+				ImageInputStream imageInputStream = ImageIO.createImageInputStream(inputStream)) {
 			if (imageInputStream == null) {
-				throw new RuntimeException(
-						"File ảnh không hợp lệ"
-				);
+				throw new RuntimeException("File ảnh không hợp lệ");
 			}
 
-			Iterator<ImageReader> readers =
-					ImageIO.getImageReaders(imageInputStream);
+			Iterator<ImageReader> readers = ImageIO.getImageReaders(imageInputStream);
 
 			if (!readers.hasNext()) {
-				throw new RuntimeException(
-						"File tải lên không phải ảnh hợp lệ"
-				);
+				throw new RuntimeException("File tải lên không phải ảnh hợp lệ");
 			}
 
 			ImageReader reader = readers.next();
 
 			try {
-				reader.setInput(
-						imageInputStream,
-						true,
-						true
-				);
+				reader.setInput(imageInputStream, true, true);
 
 				int width = reader.getWidth(0);
 				int height = reader.getHeight(0);
 
 				if (width <= 0 || height <= 0) {
-					throw new RuntimeException(
-							"Kích thước ảnh không hợp lệ"
-					);
+					throw new RuntimeException("Kích thước ảnh không hợp lệ");
 				}
 
-				if (width > MAX_AVATAR_DIMENSION
-						|| height > MAX_AVATAR_DIMENSION) {
+				if (width > MAX_AVATAR_DIMENSION || height > MAX_AVATAR_DIMENSION) {
 
-					throw new RuntimeException(
-							"Chiều rộng và chiều cao ảnh " +
-							"không được vượt quá 4096 pixel"
-					);
+					throw new RuntimeException("Chiều rộng và chiều cao ảnh " + "không được vượt quá 4096 pixel");
 				}
 
-				String format =
-						reader.getFormatName()
-								.toLowerCase(Locale.ROOT);
+				String format = reader.getFormatName().toLowerCase(Locale.ROOT);
 
 				return switch (format) {
-					case "jpg", "jpeg" -> ".jpg";
-					case "png" -> ".png";
-					default -> throw new RuntimeException(
-							"Chỉ chấp nhận ảnh JPEG hoặc PNG"
-					);
+				case "jpg", "jpeg" -> ".jpg";
+				case "png" -> ".png";
+				default -> throw new RuntimeException("Chỉ chấp nhận ảnh JPEG hoặc PNG");
 				};
 			} finally {
 				reader.dispose();
 			}
 		} catch (IOException exception) {
-			throw new RuntimeException(
-					"Không thể đọc file ảnh",
-					exception
-			);
+			throw new RuntimeException("Không thể đọc file ảnh", exception);
 		}
 	}
 
-	private void deleteStoredAvatarFile(
-			String avatarUrl) {
+	private void deleteStoredAvatarFile(String avatarUrl) {
 
 		if (avatarUrl == null || avatarUrl.isBlank()) {
+
 			return;
 		}
 
-		String normalizedUrl =
-				avatarUrl.replace('\\', '/');
+		String normalizedUrl = avatarUrl.replace('\\', '/');
 
-		String marker = "/uploads/avatars/";
+		String marker = "/uploads/";
 
-		int markerIndex =
-				normalizedUrl.indexOf(marker);
+		int markerIndex = normalizedUrl.indexOf(marker);
 
 		if (markerIndex < 0) {
-			/*
-			 * Không xóa URL ngoài hệ thống.
-			 */
 			return;
 		}
 
-		String fileName = normalizedUrl.substring(
-				markerIndex + marker.length()
-		);
+		String relativePath = normalizedUrl.substring(markerIndex + marker.length());
 
-		if (fileName.isBlank()
-				|| fileName.contains("/")
-				|| fileName.contains("\\")) {
-
+		if (relativePath.isBlank()) {
 			return;
 		}
 
-		Path filePath = avatarDirectory
-				.resolve(fileName)
-				.normalize();
+		Path filePath = uploadRoot.resolve(relativePath).normalize();
 
-		if (!filePath.startsWith(avatarDirectory)) {
+		if (!filePath.startsWith(uploadRoot)) {
 			return;
 		}
 
 		try {
 			Files.deleteIfExists(filePath);
+
+			Path avatarFolder = filePath.getParent();
+
+			/*
+			 * Xóa thư mục avatar nếu đã rỗng.
+			 */
+			if (avatarFolder != null && avatarFolder.startsWith(uploadRoot)) {
+
+				Files.deleteIfExists(avatarFolder);
+			}
 		} catch (IOException exception) {
-			LOGGER.warn(
-					"Không thể xóa avatar cũ: {}",
-					filePath,
-					exception
-			);
+			LOGGER.warn("Không thể xóa avatar cũ: {}", filePath, exception);
 		}
 	}
 
@@ -252,6 +227,27 @@ public class UserServiceImpl implements UserService {
 		String suffixCode = getSuffixCode(oldUserCode, idUser);
 
 		return nameCode + genderCode + yearCode + suffixCode;
+	}
+
+	private String getStorageCode(User user) {
+		if (user == null || user.getUserCode() == null) {
+
+			throw new RuntimeException("Không thể xác định mã lưu trữ của người dùng");
+		}
+
+		String userCode = user.getUserCode().trim();
+
+		if (userCode.length() < 5) {
+			throw new RuntimeException("Mã người dùng không hợp lệ");
+		}
+
+		String storageCode = userCode.substring(userCode.length() - 5);
+
+		if (!storageCode.matches("[A-Za-z0-9]{5}")) {
+			throw new RuntimeException("Mã lưu trữ của người dùng không hợp lệ");
+		}
+
+		return storageCode;
 	}
 
 	private String getNameCode(String fullName) {
@@ -302,15 +298,157 @@ public class UserServiceImpl implements UserService {
 	}
 
 	private String getSuffixCode(String oldUserCode, String idUser) {
-		if (oldUserCode != null && oldUserCode.length() >= 5) {
-			return oldUserCode.substring(oldUserCode.length() - 5);
+
+		if (oldUserCode != null) {
+			String normalized = oldUserCode.trim();
+
+			if (normalized.length() >= 5) {
+				return normalized.substring(normalized.length() - 5);
+			}
 		}
 
-		if (idUser != null && idUser.length() >= 5) {
-			return idUser.substring(idUser.length() - 5);
+		/*
+		 * Tương thích tài khoản cũ: năm số idUser hiện tại trở thành mã cố định.
+		 */
+		if (idUser != null) {
+			String normalizedId = idUser.trim();
+
+			if (normalizedId.length() >= 5) {
+				return normalizedId.substring(normalizedId.length() - 5);
+			}
 		}
 
-		return "00000";
+		throw new RuntimeException("Không thể xác định mã cố định của người dùng");
+	}
+
+	private String normalizeProfilePhone(String phone) {
+
+		if (phone == null || phone.isBlank()) {
+			return null;
+		}
+
+		String normalized = phone.trim().replace(" ", "").replace("-", "").replace(".", "");
+
+		if (normalized.startsWith("+84")) {
+			normalized = "0" + normalized.substring(3);
+		} else if (normalized.startsWith("84") && normalized.length() == 11) {
+
+			normalized = "0" + normalized.substring(2);
+		}
+
+		if (!normalized.matches("^0\\d{9}$")) {
+			throw new RuntimeException("Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0");
+		}
+
+		return normalized;
+	}
+
+	private void updateProfilePhone(User user, String requestedPhone) {
+
+		String normalizedPhone = normalizeProfilePhone(requestedPhone);
+
+		/*
+		 * Không nhập phone thì không thay đổi dữ liệu. Xóa phone sử dụng endpoint
+		 * riêng.
+		 */
+		if (normalizedPhone == null) {
+			return;
+		}
+
+		UserAuthProvider matchedProvider = authProviderRepository.findByPhoneAndProvider(normalizedPhone, "phone")
+				.orElse(null);
+
+		/*
+		 * Số đã hoặc đang thuộc người dùng khác. Kể cả bản ghi đã soft-delete vẫn không
+		 * tự ý chuyển quyền sở hữu sang tài khoản hiện tại.
+		 */
+		if (matchedProvider != null && matchedProvider.getUser() != null
+				&& !user.getIdUser().equals(matchedProvider.getUser().getIdUser())) {
+
+			throw new RuntimeException("Số điện thoại đã được sử dụng bởi tài khoản khác");
+		}
+
+		UserAuthProvider currentProvider = authProviderRepository
+				.findByUser_IdUserAndProviderAndDeletedAtIsNull(user.getIdUser(), "phone").orElse(null);
+
+		/*
+		 * Số này đang hoạt động trên chính tài khoản.
+		 */
+		if (matchedProvider != null && matchedProvider.getDeletedAt() == null) {
+
+			/*
+			 * Trạng thái hiện tại đã đúng, không cần cập nhật hoặc xóa xác thực.
+			 */
+			if (normalizedPhone.equals(matchedProvider.getPhone())) {
+				return;
+			}
+		}
+
+		/*
+		 * Số trùng với bản ghi đã soft-delete của chính người dùng.
+		 */
+		if (matchedProvider != null && matchedProvider.getDeletedAt() != null) {
+
+			/*
+			 * Trước khi khôi phục số cũ, xử lý số đang hoạt động hiện tại nếu đó là bản ghi
+			 * khác.
+			 */
+			if (currentProvider != null && !currentProvider.getId().equals(matchedProvider.getId())) {
+
+				removeCurrentPhoneForReplacement(currentProvider);
+			}
+
+			LocalDateTime now = LocalDateTime.now();
+
+			matchedProvider.setDeletedAt(null);
+
+			/*
+			 * Theo yêu cầu: thêm lại số cũ thì phải xác thực lại từ đầu.
+			 */
+			matchedProvider.setPhoneVerifiedAt(null);
+			matchedProvider.setUpdatedAt(now);
+
+			authProviderRepository.save(matchedProvider);
+
+			return;
+		}
+
+		/*
+		 * Chưa có provider phone nào.
+		 */
+		if (currentProvider == null) {
+			createUnverifiedPhoneProvider(user, normalizedPhone);
+
+			return;
+		}
+
+		/*
+		 * Người dùng gửi lại đúng số đang có.
+		 */
+		if (normalizedPhone.equals(currentProvider.getPhone())) {
+			return;
+		}
+
+		/*
+		 * Số hiện tại đã xác thực: giữ lịch sử bằng soft-delete và tạo record mới.
+		 */
+		if (currentProvider.getPhoneVerifiedAt() != null) {
+			removeCurrentPhoneForReplacement(currentProvider);
+
+			createUnverifiedPhoneProvider(user, normalizedPhone);
+
+			return;
+		}
+
+		/*
+		 * Số hiện tại chưa xác thực: có thể cập nhật trực tiếp vì chưa cần giữ lịch sử.
+		 */
+		currentProvider.setPhone(normalizedPhone);
+		currentProvider.setPhoneVerifiedAt(null);
+		currentProvider.setDeletedAt(null);
+		currentProvider.setUpdatedAt(LocalDateTime.now());
+
+		authProviderRepository.save(currentProvider);
 	}
 
 	@Override
@@ -367,55 +505,37 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	@Transactional
-	public User updateProfile(
-			String id,
-			UpdateProfileRequest request) {
+	public User updateProfile(String id, UpdateProfileRequest request) {
 
 		if (request == null) {
-			throw new RuntimeException(
-					"Thông tin cập nhật không hợp lệ"
-			);
+			throw new RuntimeException("Thông tin cập nhật không hợp lệ");
 		}
 
 		User user = findById(id);
 
-		String fullName = request.getFullName() == null
-				? ""
-				: request.getFullName().trim();
+		String fullName = request.getFullName() == null ? "" : request.getFullName().trim();
 
-		String gender = request.getGender() == null
-				? ""
-				: request.getGender().trim();
+		String gender = request.getGender() == null ? "" : request.getGender().trim();
 
 		LocalDate birthday = request.getBirthday();
 
 		if (fullName.isBlank()) {
-			throw new RuntimeException(
-					"Vui lòng nhập họ và tên"
-			);
+			throw new RuntimeException("Vui lòng nhập họ và tên");
 		}
 
 		if (birthday == null) {
-			throw new RuntimeException(
-					"Vui lòng nhập ngày sinh"
-			);
+			throw new RuntimeException("Vui lòng nhập ngày sinh");
 		}
 
 		if (!birthday.isBefore(LocalDate.now())) {
-			throw new RuntimeException(
-					"Ngày sinh phải nhỏ hơn ngày hiện tại"
-			);
+			throw new RuntimeException("Ngày sinh phải nhỏ hơn ngày hiện tại");
 		}
 
-		boolean validGender =
-				"Male".equalsIgnoreCase(gender)
-				|| "Female".equalsIgnoreCase(gender)
+		boolean validGender = "Male".equalsIgnoreCase(gender) || "Female".equalsIgnoreCase(gender)
 				|| "Unknown".equalsIgnoreCase(gender);
 
 		if (!validGender) {
-			throw new RuntimeException(
-					"Giới tính không hợp lệ"
-			);
+			throw new RuntimeException("Giới tính không hợp lệ");
 		}
 
 		String normalizedGender;
@@ -432,13 +552,10 @@ public class UserServiceImpl implements UserService {
 		user.setGender(normalizedGender);
 		user.setBirthday(birthday);
 
-		String newUserCode = generateUserCode(
-				user.getFullName(),
-				user.getGender(),
-				user.getBirthday(),
-				user.getUserCode(),
-				user.getIdUser()
-		);
+		updateProfilePhone(user, request.getPhone());
+
+		String newUserCode = generateUserCode(user.getFullName(), user.getGender(), user.getBirthday(),
+				user.getUserCode(), user.getIdUser());
 
 		user.setUserCode(newUserCode);
 		user.setUpdatedAt(LocalDateTime.now());
@@ -453,18 +570,59 @@ public class UserServiceImpl implements UserService {
 		deleteAccount(id);
 	}
 
+	@Override
+	@Transactional
+	public Map<String, Object> deletePhone(String idUser, Long providerId) {
+
+		if (idUser == null || idUser.isBlank()) {
+			throw new RuntimeException("Bạn chưa đăng nhập");
+		}
+
+		if (providerId == null) {
+			throw new RuntimeException("Thông tin số điện thoại không hợp lệ");
+		}
+
+		UserAuthProvider provider = authProviderRepository
+				.findByIdAndUser_IdUserAndProviderAndDeletedAtIsNull(providerId, idUser, "phone")
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy số điện thoại"));
+
+		User user = provider.getUser();
+
+		boolean verified = provider.getPhoneVerifiedAt() != null;
+
+		if (verified) {
+			/*
+			 * Số đã xác thực: soft-delete để giữ lịch sử.
+			 */
+			LocalDateTime now = LocalDateTime.now();
+
+			provider.setDeletedAt(now);
+			provider.setUpdatedAt(now);
+
+			authProviderRepository.save(provider);
+		} else {
+			/*
+			 * Số chưa xác thực: xóa hoàn toàn.
+			 */
+			authProviderRepository.delete(provider);
+			authProviderRepository.flush();
+		}
+
+		/*
+		 * Việc xóa số đã xác thực có thể làm tài khoản chuyển từ active về pending.
+		 */
+		User refreshedUser = userStatusService.refreshStatus(user);
+
+		return Map.of("message", verified ? "Đã gỡ số điện thoại" : "Đã xóa số điện thoại", "deleteType",
+				verified ? "soft" : "hard", "status", refreshedUser.getStatus());
+	}
+
 	// Delete Avatar
 	@Override
 	@Transactional
-	public Map<String, Object> deleteAvatar(
-			String idUser) {
+	public Map<String, Object> deleteAvatar(String idUser) {
 
-		User user = repository.findById(idUser)
-				.orElseThrow(() ->
-						new RuntimeException(
-								"Không tìm thấy người dùng"
-						)
-				);
+		User user = repository.findById(idUser).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
 		String oldAvatar = user.getAvatar();
 
@@ -477,10 +635,7 @@ public class UserServiceImpl implements UserService {
 
 		Map<String, Object> result = new HashMap<>();
 
-		result.put(
-				"message",
-				"Xóa avatar thành công"
-		);
+		result.put("message", "Xóa avatar thành công");
 		result.put("avatar", null);
 
 		return result;
@@ -489,62 +644,44 @@ public class UserServiceImpl implements UserService {
 	// Upload Avatar
 	@Override
 	@Transactional
-	public Map<String, Object> uploadAvatar(
-			String idUser,
-			MultipartFile file) {
+	public Map<String, Object> uploadAvatar(String idUser, MultipartFile file) {
 
-		User user = repository.findById(idUser)
-				.orElseThrow(() ->
-						new RuntimeException(
-								"Không tìm thấy người dùng"
-						)
-				);
+		User user = repository.findById(idUser).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
-		String extension =
-				validateAvatarAndGetExtension(file);
+		String extension = validateAvatarAndGetExtension(file);
+
+		String storageCode = getStorageCode(user);
+
+		Path avatarDirectory = uploadRoot.resolve(storageCode).resolve("avatar").normalize();
+
+		if (!avatarDirectory.startsWith(uploadRoot)) {
+			throw new RuntimeException("Đường dẫn lưu avatar không hợp lệ");
+		}
 
 		try {
 			Files.createDirectories(avatarDirectory);
 		} catch (IOException exception) {
-			throw new RuntimeException(
-					"Không thể tạo thư mục lưu avatar",
-					exception
-			);
+			throw new RuntimeException("Không thể tạo thư mục lưu avatar", exception);
 		}
 
-		String fileName =
-				idUser
-				+ "_"
-				+ UUID.randomUUID()
-				+ extension;
+		String fileName = UUID.randomUUID() + extension;
 
-		Path filePath = avatarDirectory
-				.resolve(fileName)
-				.normalize();
+		Path filePath = avatarDirectory.resolve(fileName).normalize();
 
 		if (!filePath.startsWith(avatarDirectory)) {
-			throw new RuntimeException(
-					"Đường dẫn lưu avatar không hợp lệ"
-			);
+			throw new RuntimeException("Đường dẫn lưu avatar không hợp lệ");
 		}
 
-		try (InputStream inputStream =
-				file.getInputStream()) {
+		try (InputStream inputStream = file.getInputStream()) {
 
 			Files.copy(inputStream, filePath);
 		} catch (IOException exception) {
-			throw new RuntimeException(
-					"Không thể lưu ảnh đại diện",
-					exception
-			);
+			throw new RuntimeException("Không thể lưu ảnh đại diện", exception);
 		}
 
 		String oldAvatar = user.getAvatar();
 
-		String avatarUrl =
-				publicBaseUrl
-				+ "/uploads/avatars/"
-				+ fileName;
+		String avatarUrl = publicBaseUrl + "/uploads/" + storageCode + "/avatar/" + fileName;
 
 		try {
 			user.setAvatar(avatarUrl);
@@ -555,23 +692,15 @@ public class UserServiceImpl implements UserService {
 			try {
 				Files.deleteIfExists(filePath);
 			} catch (IOException cleanupException) {
-				LOGGER.warn(
-						"Không thể dọn avatar sau khi lưu DB thất bại",
-						cleanupException
-				);
+				LOGGER.warn("Không thể dọn avatar sau khi lưu DB thất bại", cleanupException);
 			}
 
 			throw exception;
 		}
 
-	deleteStoredAvatarFile(oldAvatar);
+		deleteStoredAvatarFile(oldAvatar);
 
-		return Map.of(
-				"message",
-				"Upload avatar thành công",
-				"avatar",
-				avatarUrl
-		);
+		return Map.of("message", "Upload avatar thành công", "avatar", avatarUrl);
 	}
 
 	// Change Password

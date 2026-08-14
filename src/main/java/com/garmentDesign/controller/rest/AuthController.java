@@ -185,15 +185,9 @@ public class AuthController {
 	public ResponseEntity<?> verifyMyEmailOtp(Authentication authentication, @RequestBody Map<String, String> body) {
 		return ResponseEntity.ok(authService.verifyMyEmailOtp(authentication.getName(), body.get("otp")));
 	}
-	
+
 	@DeleteMapping("/me/email/verification")
-	public ResponseEntity<?> removeMyEmailVerification(
-			Authentication authentication
-	) {
-		return ResponseEntity.ok(
-				authService.removeMyEmailVerification(
-						authentication.getName()
-				)
-		);
+	public ResponseEntity<?> removeMyEmailVerification(Authentication authentication) {
+		return ResponseEntity.ok(authService.removeMyEmailVerification(authentication.getName()));
 	}
 }

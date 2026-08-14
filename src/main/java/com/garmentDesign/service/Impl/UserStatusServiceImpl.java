@@ -40,42 +40,24 @@ public class UserStatusServiceImpl implements UserStatusService {
 	@Transactional
 	public User refreshStatus(User user) {
 		if (user == null) {
-			throw new RuntimeException(
-					"Không tìm thấy người dùng"
-			);
+			throw new RuntimeException("Không tìm thấy người dùng");
 		}
 
 		String currentStatus = user.getStatus();
 
-		if ("inactive".equalsIgnoreCase(currentStatus)
-				|| "banned".equalsIgnoreCase(currentStatus)
+		if ("inactive".equalsIgnoreCase(currentStatus) || "banned".equalsIgnoreCase(currentStatus)
 				|| "delete".equalsIgnoreCase(currentStatus)) {
 
 			return user;
 		}
 
-		boolean hasVerifiedContact =
-				authProviderRepository
-						.findByUser_IdUserAndDeletedAtIsNull(
-								user.getIdUser()
-						)
-						.stream()
-						.anyMatch(provider ->
-								provider.getEmailVerifiedAt() != null
-								|| provider.getPhoneVerifiedAt() != null
-						);
+		boolean hasVerifiedContact = authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(user.getIdUser())
+				.stream()
+				.anyMatch(provider -> provider.getEmailVerifiedAt() != null || provider.getPhoneVerifiedAt() != null);
 
-		boolean hasAddress =
-				addressRepository
-						.existsByUser_IdUserAndDeletedAtIsNull(
-								user.getIdUser()
-						);
+		boolean hasAddress = addressRepository.existsByUser_IdUserAndDeletedAtIsNull(user.getIdUser());
 
-		user.setStatus(
-				hasVerifiedContact && hasAddress
-						? "active"
-						: "pending"
-		);
+		user.setStatus(hasVerifiedContact && hasAddress ? "active" : "pending");
 
 		user.setUpdatedAt(LocalDateTime.now());
 

@@ -32,4 +32,7 @@ public interface UserAuthProviderRepository extends JpaRepository<UserAuthProvid
 	Optional<UserAuthProvider> findByUser_IdUserAndProviderAndDeletedAtIsNull(String idUser, String provider);
 
 	List<UserAuthProvider> findAllByEmailIgnoreCase(String email);
+
+	Optional<UserAuthProvider> findByIdAndUser_IdUserAndProviderAndDeletedAtIsNull(Long id, String idUser,
+			String provider);
 }

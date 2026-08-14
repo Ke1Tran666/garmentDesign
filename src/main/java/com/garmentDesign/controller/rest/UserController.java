@@ -95,4 +95,10 @@ public class UserController {
 	public ResponseEntity<?> deleteAccount(Authentication authentication) {
 		return ResponseEntity.ok(service.deleteAccount(authentication.getName()));
 	}
+
+	@DeleteMapping("/me/phone/{providerId}")
+	public ResponseEntity<?> deletePhone(Authentication authentication, @PathVariable Long providerId) {
+
+		return ResponseEntity.ok(service.deletePhone(authentication.getName(), providerId));
+	}
 }
