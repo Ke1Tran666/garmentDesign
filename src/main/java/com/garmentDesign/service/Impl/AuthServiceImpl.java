@@ -34,8 +34,21 @@ import java.util.Locale;
 
 import com.garmentDesign.service.UserSessionService;
 
+import java.security.SecureRandom;
+
 @Service
 public class AuthServiceImpl implements AuthService {
+
+	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+	private static final String UPPERCASE_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+	private static final String LOWERCASE_CHARACTERS = "abcdefghijkmnopqrstuvwxyz";
+
+	private static final String NUMBER_CHARACTERS = "23456789";
+
+	private static final String STORAGE_CODE_CHARACTERS = UPPERCASE_CHARACTERS + LOWERCASE_CHARACTERS
+			+ NUMBER_CHARACTERS;
 
 	private final UserAuthProviderRepository authProviderRepository;
 	private final UserRepository userRepository;
@@ -61,6 +74,54 @@ public class AuthServiceImpl implements AuthService {
 		this.userStatusService = userStatusService;
 		this.googleIdTokenVerifier = googleIdTokenVerifier;
 		this.userSessionService = userSessionService;
+	}
+
+	private String randomCharacter(String characters) {
+		int index = SECURE_RANDOM.nextInt(characters.length());
+
+		return String.valueOf(characters.charAt(index));
+	}
+
+	private String generateStorageCode() {
+		char[] result = new char[5];
+
+		// Bảo đảm có đủ chữ hoa, chữ thường và số.
+		result[0] = randomCharacter(UPPERCASE_CHARACTERS).charAt(0);
+
+		result[1] = randomCharacter(LOWERCASE_CHARACTERS).charAt(0);
+
+		result[2] = randomCharacter(NUMBER_CHARACTERS).charAt(0);
+
+		result[3] = randomCharacter(STORAGE_CODE_CHARACTERS).charAt(0);
+
+		result[4] = randomCharacter(STORAGE_CODE_CHARACTERS).charAt(0);
+
+		// Trộn vị trí các ký tự.
+		for (int index = result.length - 1; index > 0; index--) {
+
+			int randomIndex = SECURE_RANDOM.nextInt(index + 1);
+
+			char temporary = result[index];
+			result[index] = result[randomIndex];
+			result[randomIndex] = temporary;
+		}
+
+		return new String(result);
+	}
+
+	private String generateUniqueStorageCode() {
+		for (int attempt = 0; attempt < 100; attempt++) {
+
+			String storageCode = generateStorageCode();
+
+			boolean exists = userRepository.existsByUserCodeEndingWithIgnoreCase(storageCode);
+
+			if (!exists) {
+				return storageCode;
+			}
+		}
+
+		throw new RuntimeException("Không thể tạo mã lưu trữ duy nhất");
 	}
 
 	private String normalizeEmail(String email) {
@@ -109,7 +170,9 @@ public class AuthServiceImpl implements AuthService {
 	private User createPendingGoogleUser(String fullName) {
 		String idUser = generateRandom5Number();
 		String prefixName = generateNameCode(fullName);
-		String userCode = prefixName + "U00" + idUser;
+		String storageCode = generateUniqueStorageCode();
+
+		String userCode = prefixName + "U00" + storageCode;
 
 		Role userRole = roleRepository.findById(3L).orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
 
@@ -164,7 +227,9 @@ public class AuthServiceImpl implements AuthService {
 
 	private User createPendingPhoneUser() {
 		String idUser = generateRandom5Number();
-		String userCode = "USEU00" + idUser;
+		String storageCode = generateUniqueStorageCode();
+
+		String userCode = "USEU00" + storageCode;
 
 		Role userRole = roleRepository.findById(3L).orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
 
@@ -484,7 +549,9 @@ public class AuthServiceImpl implements AuthService {
 		String yearCode = parsedBirthday == null ? "00"
 				: String.format(Locale.ROOT, "%02d", parsedBirthday.getYear() % 100);
 
-		String userCode = prefixName + genderCode + yearCode + idUser;
+		String storageCode = generateUniqueStorageCode();
+
+		String userCode = prefixName + genderCode + yearCode + storageCode;
 
 		Role userRole = roleRepository.findById(3L).orElseThrow(() -> new RuntimeException("Role user không tồn tại"));
 
@@ -715,31 +782,21 @@ public class AuthServiceImpl implements AuthService {
 
 		return createLoginResult(user);
 	}
-	
+
 	@Override
 	@Transactional
-	public Map<String, Object> removeMyEmailVerification(
-			String idUser
-	) {
-		UserAuthProvider provider =
-				getMyActiveLocalProvider(idUser);
+	public Map<String, Object> removeMyEmailVerification(String idUser) {
+		UserAuthProvider provider = getMyActiveLocalProvider(idUser);
 
-		String normalizedEmail =
-				normalizeEmail(provider.getEmail());
+		String normalizedEmail = normalizeEmail(provider.getEmail());
 
 		/*
 		 * Hủy luôn OTP xác thực đang tồn tại.
 		 */
-		otpService.clearOtp(
-				normalizedEmail,
-				VERIFY_EMAIL_OTP
-		);
+		otpService.clearOtp(normalizedEmail, VERIFY_EMAIL_OTP);
 
 		if (provider.getEmailVerifiedAt() == null) {
-			return Map.of(
-					"message", "Email hiện chưa được xác thực",
-					"status", provider.getUser().getStatus()
-			);
+			return Map.of("message", "Email hiện chưa được xác thực", "status", provider.getUser().getStatus());
 		}
 
 		LocalDateTime now = LocalDateTime.now();
@@ -749,14 +806,8 @@ public class AuthServiceImpl implements AuthService {
 
 		authProviderRepository.save(provider);
 
-		User refreshedUser =
-				userStatusService.refreshStatus(
-						provider.getUser()
-				);
+		User refreshedUser = userStatusService.refreshStatus(provider.getUser());
 
-		return Map.of(
-				"message", "Đã bỏ xác thực email",
-				"status", refreshedUser.getStatus()
-		);
+		return Map.of("message", "Đã bỏ xác thực email", "status", refreshedUser.getStatus());
 	}
 }

@@ -10,19 +10,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${app.upload.root-dir:uploads}")
-    private String uploadRoot;
+	@Value("${app.upload.root-dir:uploads}")
+	private String uploadRoot;
 
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String uploadLocation = Path.of(uploadRoot)
-                .toAbsolutePath()
-                .normalize()
-                .toUri()
-                .toString();
+	@Override
+	public void addResourceHandlers(ResourceHandlerRegistry registry) {
 
-        registry
-                .addResourceHandler("/uploads/**")
-                .addResourceLocations(uploadLocation);
-    }
+		String uploadLocation = Path.of(uploadRoot).toAbsolutePath().normalize().toUri().toString();
+
+		registry.addResourceHandler("/uploads/**").addResourceLocations(uploadLocation);
+	}
 }

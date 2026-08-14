@@ -10,6 +10,8 @@ public class UpdateProfileRequest {
 
 	private LocalDate birthday;
 
+	private String phone;
+
 	public UpdateProfileRequest() {
 	}
 
@@ -35,5 +37,13 @@ public class UpdateProfileRequest {
 
 	public void setBirthday(LocalDate birthday) {
 		this.birthday = birthday;
+	}
+
+	public String getPhone() {
+		return phone;
+	}
+
+	public void setPhone(String phone) {
+		this.phone = phone;
 	}
 }

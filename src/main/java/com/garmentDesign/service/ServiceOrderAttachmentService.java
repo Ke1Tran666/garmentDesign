@@ -37,11 +37,47 @@ public class ServiceOrderAttachmentService {
 
 	public ServiceOrderAttachmentService(ServiceOrderRepository orderRepository,
 			ServiceOrderFileRepository fileRepository,
-			@Value("${app.upload.service-order-dir}") String uploadDirectory) {
+			@Value("${app.upload.root-dir:uploads}") String uploadDirectory) {
 		this.orderRepository = orderRepository;
 		this.fileRepository = fileRepository;
 
 		this.uploadRoot = Paths.get(uploadDirectory).toAbsolutePath().normalize();
+	}
+
+	private String getStorageCode(ServiceOrder order, String fallbackIdUser) {
+
+		String userCode = null;
+
+		if (order != null && order.getUser() != null) {
+			userCode = order.getUser().getUserCode();
+
+			if (userCode == null || userCode.isBlank()) {
+				userCode = order.getUser().getIdUser();
+			}
+		}
+
+		if ((userCode == null || userCode.isBlank()) && fallbackIdUser != null && !fallbackIdUser.isBlank()) {
+
+			userCode = fallbackIdUser;
+		}
+
+		if (userCode == null || userCode.isBlank()) {
+			throw new RuntimeException("Không thể xác định mã lưu trữ của người dùng.");
+		}
+
+		String normalized = userCode.trim();
+
+		if (normalized.length() < 5) {
+			throw new RuntimeException("Mã người dùng không đủ 5 ký tự cố định.");
+		}
+
+		String storageCode = normalized.substring(normalized.length() - 5);
+
+		if (!storageCode.matches("[A-Za-z0-9]{5}")) {
+			throw new RuntimeException("Mã lưu trữ người dùng không hợp lệ.");
+		}
+
+		return storageCode;
 	}
 
 	@Transactional
@@ -52,33 +88,30 @@ public class ServiceOrderAttachmentService {
 
 		validateOwner(order, idUser);
 
-		String userCode = order.getUser().getUserCode();
+		String storageCode = getStorageCode(order, idUser);
 
-		if (userCode == null || userCode.isBlank()) {
-			userCode = idUser;
-		}
-
-		String safeUserCode = sanitizeFolderName(userCode);
-
-		String orderFolderName = safeUserCode + "_" + orderId;
+		String orderFolderName = storageCode + "_" + orderId;
 
 		/*
-		 * uploads/service-orders/{userCode}
+		 * uploads/<5-ký-tự>/
 		 */
-		Path userDirectory = uploadRoot.resolve(safeUserCode).normalize();
+		Path userDirectory = uploadRoot.resolve(storageCode).normalize();
 
 		/*
-		 * uploads/service-orders/{userCode}/{userCode}_{orderId}
+		 * uploads/<5-ký-tự>/order/
 		 */
-		Path orderDirectory = userDirectory.resolve(orderFolderName).normalize();
+		Path orderRootDirectory = userDirectory.resolve("order").normalize();
+
+		/*
+		 * uploads/<5-ký-tự>/order/<5-ký-tự>_<idOrder>/
+		 */
+		Path orderDirectory = orderRootDirectory.resolve(orderFolderName).normalize();
 
 		validatePath(userDirectory);
+		validatePath(orderRootDirectory);
 		validatePath(orderDirectory);
 
-		/*
-		 * Path tương đối được lưu vào database. Ví dụ: USR001/USR001_15
-		 */
-		String relativeOrderDirectory = safeUserCode + "/" + orderFolderName;
+		String relativeOrderDirectory = storageCode + "/order/" + orderFolderName;
 
 		try {
 			Files.createDirectories(orderDirectory);
@@ -302,7 +335,7 @@ public class ServiceOrderAttachmentService {
 		/*
 		 * Ví dụ: /uploads/service-orders/USR001/USR001_15/product-image-uuid.jpg
 		 */
-		return "/uploads/service-orders/" + relativeOrderDirectory + "/" + storedFileName;
+		return "/uploads/" + relativeOrderDirectory + "/" + storedFileName;
 	}
 
 	private void deleteProductImage(String productImageUrl) {
@@ -310,7 +343,7 @@ public class ServiceOrderAttachmentService {
 			return;
 		}
 
-		String urlPrefix = "/uploads/service-orders/";
+		String urlPrefix = "/uploads/";
 
 		/*
 		 * Không xóa ảnh ngoài thư mục quản lý. Đồng thời bỏ qua URL cũ sử dụng fileId.
@@ -376,13 +409,18 @@ public class ServiceOrderAttachmentService {
 
 		String safeUserCode = sanitizeFolderName(userCode);
 
-		String orderFolderName = safeUserCode + "_" + order.getServiceOrderId();
+		String storageCode = getStorageCode(order, order.getUser() == null ? null : order.getUser().getIdUser());
 
-		Path userDirectory = uploadRoot.resolve(safeUserCode).normalize();
+		String orderFolderName = storageCode + "_" + order.getServiceOrderId();
 
-		Path orderDirectory = userDirectory.resolve(orderFolderName).normalize();
+		Path userDirectory = uploadRoot.resolve(storageCode).normalize();
+
+		Path orderRootDirectory = userDirectory.resolve("order").normalize();
+
+		Path orderDirectory = orderRootDirectory.resolve(orderFolderName).normalize();
 
 		validatePath(userDirectory);
+		validatePath(orderRootDirectory);
 		validatePath(orderDirectory);
 
 		/*
@@ -408,10 +446,18 @@ public class ServiceOrderAttachmentService {
 		 * Xóa thư mục user nếu đã rỗng.
 		 */
 		try {
+			Files.deleteIfExists(orderRootDirectory);
+		} catch (Exception ignored) {
+			/*
+			 * Người dùng còn đơn hàng khác nên thư mục order chưa rỗng.
+			 */
+		}
+
+		try {
 			Files.deleteIfExists(userDirectory);
 		} catch (Exception ignored) {
 			/*
-			 * User còn đơn khác thì thư mục không rỗng, không cần xóa.
+			 * Người dùng vẫn còn avatar hoặc dữ liệu khác.
 			 */
 		}
 	}

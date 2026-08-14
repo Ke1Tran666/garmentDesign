@@ -28,4 +28,6 @@ public interface UserService {
 	Map<String, Object> exportUserData(String idUser);
 
 	Map<String, Object> deleteAccount(String idUser);
+
+	Map<String, Object> deletePhone(String idUser, Long providerId);
 }
