@@ -16,6 +16,9 @@ import com.garmentDesign.dto.user.UpdateProfileRequest;
 import com.garmentDesign.entity.User;
 import com.garmentDesign.service.UserService;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
+
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -81,9 +84,17 @@ public class UserController {
 	}
 
 	@PutMapping("/me/change-password")
-	public ResponseEntity<?> changePassword(Authentication authentication, @RequestBody Map<String, String> body) {
-		return ResponseEntity
-				.ok(service.changePassword(authentication.getName(), body.get("oldPassword"), body.get("newPassword")));
+	public ResponseEntity<?> changePassword(Authentication authentication, @RequestBody Map<String, String> body,
+			HttpServletRequest request) {
+
+		HttpSession currentSession = request.getSession(false);
+
+		if (currentSession == null) {
+			throw new RuntimeException("Không thể xác định phiên đăng nhập hiện tại");
+		}
+
+		return ResponseEntity.ok(service.changePassword(authentication.getName(), body.get("oldPassword"),
+				body.get("newPassword"), currentSession.getId()));
 	}
 
 	@GetMapping("/me/export-data")
