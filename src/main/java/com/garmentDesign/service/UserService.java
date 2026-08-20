@@ -23,7 +23,7 @@ public interface UserService {
 
 	Map<String, Object> deleteAvatar(String idUser);
 
-	Map<String, Object> changePassword(String idUser, String oldPassword, String newPassword);
+	Map<String, Object> changePassword(String idUser, String oldPassword, String newPassword, String currentSessionId);
 
 	Map<String, Object> exportUserData(String idUser);
 

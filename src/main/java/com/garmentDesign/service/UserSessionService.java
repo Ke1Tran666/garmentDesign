@@ -42,11 +42,35 @@ public class UserSessionService {
 		sessionRegistry.removeSessionInformation(sessionId);
 	}
 
+	/*
+	 * Dùng cho luồng quên mật khẩu: vô hiệu hóa toàn bộ session, bao gồm thiết bị
+	 * hiện tại.
+	 */
 	public void expireAllSessions(String idUser) {
 		if (idUser == null || idUser.isBlank()) {
 			return;
 		}
 
 		sessionRegistry.getAllSessions(idUser, false).forEach(SessionInformation::expireNow);
+	}
+
+	/*
+	 * Dùng cho luồng đổi mật khẩu khi đã đăng nhập: chỉ vô hiệu hóa session của các
+	 * thiết bị khác.
+	 */
+	public void expireOtherSessions(String idUser, String currentSessionId) {
+
+		if (idUser == null || idUser.isBlank()) {
+			throw new RuntimeException("Người dùng không hợp lệ");
+		}
+
+		if (currentSessionId == null || currentSessionId.isBlank()) {
+
+			throw new RuntimeException("Không thể xác định phiên đăng nhập hiện tại");
+		}
+
+		sessionRegistry.getAllSessions(idUser, false).stream()
+				.filter(session -> !currentSessionId.equals(session.getSessionId()))
+				.forEach(SessionInformation::expireNow);
 	}
 }

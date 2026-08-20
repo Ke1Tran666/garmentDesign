@@ -22,6 +22,7 @@ import com.garmentDesign.repository.UserRepository;
 import com.garmentDesign.service.PasswordService;
 import com.garmentDesign.service.UserService;
 import com.garmentDesign.service.UserStatusService;
+import com.garmentDesign.service.UserSessionService;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +46,7 @@ public class UserServiceImpl implements UserService {
 	private final UserAddressRepository addressRepository;
 	private final PasswordService passwordService;
 	private final UserStatusService userStatusService;
+	private final UserSessionService userSessionService;
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(UserServiceImpl.class);
 
@@ -59,7 +61,8 @@ public class UserServiceImpl implements UserService {
 
 	public UserServiceImpl(UserRepository repository, UserAuthProviderRepository authProviderRepository,
 			UserAddressRepository addressRepository, PasswordService passwordService,
-			UserStatusService userStatusService, @Value("${app.upload.root-dir:uploads}") String uploadRoot,
+			UserStatusService userStatusService, UserSessionService userSessionService,
+			@Value("${app.upload.root-dir:uploads}") String uploadRoot,
 			@Value("${app.public-base-url:http://localhost:8082}") String publicBaseUrl) {
 
 		this.repository = repository;
@@ -67,11 +70,11 @@ public class UserServiceImpl implements UserService {
 		this.addressRepository = addressRepository;
 		this.passwordService = passwordService;
 		this.userStatusService = userStatusService;
+		this.userSessionService = userSessionService;
 
 		this.uploadRoot = Path.of(uploadRoot).toAbsolutePath().normalize();
 
 		if (publicBaseUrl == null || publicBaseUrl.isBlank()) {
-
 			throw new IllegalStateException("APP_PUBLIC_BASE_URL chưa được cấu hình");
 		}
 
@@ -706,9 +709,16 @@ public class UserServiceImpl implements UserService {
 	// Change Password
 	@Override
 	@Transactional
-	public Map<String, Object> changePassword(String idUser, String oldPassword, String newPassword) {
+	public Map<String, Object> changePassword(String idUser, String oldPassword, String newPassword,
+			String currentSessionId) {
+
 		if (idUser == null || idUser.isBlank()) {
 			throw new RuntimeException("Không tìm thấy người dùng");
+		}
+
+		if (currentSessionId == null || currentSessionId.isBlank()) {
+
+			throw new RuntimeException("Không thể xác định phiên đăng nhập hiện tại");
 		}
 
 		User user = repository.findById(idUser).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
@@ -738,15 +748,26 @@ public class UserServiceImpl implements UserService {
 		}
 
 		if (!passwordService.matches(oldPassword, storedPassword)) {
+
 			throw new RuntimeException("Mật khẩu hiện tại không đúng");
 		}
 
 		localProvider.setPassword(passwordService.encode(newPassword));
+
 		localProvider.setUpdatedAt(LocalDateTime.now());
 
-		authProviderRepository.save(localProvider);
+		/*
+		 * Flush mật khẩu mới xuống database trước khi vô hiệu hóa session của các thiết
+		 * bị khác.
+		 */
+		authProviderRepository.saveAndFlush(localProvider);
 
-		return Map.of("message", "Đổi mật khẩu thành công");
+		/*
+		 * Không expire session đang thực hiện đổi mật khẩu.
+		 */
+		userSessionService.expireOtherSessions(idUser, currentSessionId);
+
+		return Map.of("message", "Đổi mật khẩu thành công. " + "Các thiết bị khác đã được đăng xuất");
 	}
 
 	@Override
