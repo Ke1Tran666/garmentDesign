@@ -19,14 +19,23 @@ import com.garmentDesign.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.garmentDesign.service.UserSessionService;
+
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
 
 	private final UserService service;
+	private final UserSessionService userSessionService;
 
-	public UserController(UserService service) {
+	public UserController(
+			UserService service,
+			UserSessionService userSessionService) {
+
 		this.service = service;
+		this.userSessionService = userSessionService;
 	}
 
 	/*
@@ -53,15 +62,15 @@ public class UserController {
 
 	@DeleteMapping("/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<Void> delete(@PathVariable String id) {
+	public ResponseEntity<Void> delete(
+			@PathVariable String id) {
+
 		service.delete(id);
+
+		userSessionService.expireAllSessions(id);
 
 		return ResponseEntity.noContent().build();
 	}
-
-	/*
-	 * API người dùng hiện tại
-	 */
 
 	@GetMapping("/me")
 	public ResponseEntity<?> getMyProfile(Authentication authentication) {
@@ -103,8 +112,27 @@ public class UserController {
 	}
 
 	@DeleteMapping("/me/delete-account")
-	public ResponseEntity<?> deleteAccount(Authentication authentication) {
-		return ResponseEntity.ok(service.deleteAccount(authentication.getName()));
+	public ResponseEntity<?> deleteAccount(
+			Authentication authentication,
+			HttpServletRequest request) {
+
+		String idUser = authentication.getName();
+
+		Map<String, Object> result =
+				service.deleteAccount(idUser);
+
+		userSessionService.expireAllSessions(idUser);
+
+		HttpSession currentSession =
+				request.getSession(false);
+
+		if (currentSession != null) {
+			currentSession.invalidate();
+		}
+
+		SecurityContextHolder.clearContext();
+
+		return ResponseEntity.ok(result);
 	}
 
 	@DeleteMapping("/me/phone/{providerId}")

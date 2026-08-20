@@ -39,6 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 
+import java.util.LinkedHashMap;
+
 @Service
 public class UserServiceImpl implements UserService {
 	private final UserRepository repository;
@@ -569,6 +571,7 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
+	@Transactional
 	public void delete(String id) {
 		deleteAccount(id);
 	}
@@ -771,59 +774,159 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Map<String, Object> exportUserData(String idUser) {
 
-		User user = repository.findById(idUser).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+		User user = repository.findById(idUser)
+				.orElseThrow(() -> new RuntimeException(
+						"Không tìm thấy người dùng"));
 
-		List<UserAuthProvider> authProviders = authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+		Long defaultAddressId = user.getDefaultAddress() != null
+				? user.getDefaultAddress().getAddressId()
+				: null;
 
-		List<UserAddress> addresses = addressRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+		List<Map<String, Object>> addresses = addressRepository
+				.findByUser_IdUserOrderByCreatedAtAsc(idUser)
+				.stream()
+				.map(address -> toExportAddress(
+						address,
+						idUser,
+						defaultAddressId))
+				.toList();
 
-		// Không export password
-		authProviders.forEach(provider -> provider.setPassword(null));
+		List<Map<String, Object>> authProviders = authProviderRepository
+				.findByUser_IdUserOrderByCreatedAtAsc(idUser)
+				.stream()
+				.map(provider -> toExportAuthProvider(
+						provider,
+						idUser))
+				.toList();
 
-		Map<String, Object> result = new HashMap<>();
+		Map<String, Object> result = new LinkedHashMap<>();
 
-		result.put("user", user);
-		result.put("authProviders", authProviders);
+		result.put("user", toExportUser(user, defaultAddressId));
 		result.put("addresses", addresses);
-		result.put("defaultAddress", user.getDefaultAddress());
+		result.put("authProviders", authProviders);
 
 		return result;
 	}
 
+	private Map<String, Object> toExportUser(
+			User user,
+			Long defaultAddressId) {
+
+		Map<String, Object> data = new LinkedHashMap<>();
+
+		data.put("idUser", user.getIdUser());
+		data.put("userCode", user.getUserCode());
+		data.put("fullName", user.getFullName());
+		data.put("avatar", user.getAvatar());
+		data.put("gender", user.getGender());
+		data.put("birthday", user.getBirthday());
+
+		data.put(
+				"roleId",
+				user.getRole() != null
+						? user.getRole().getIdRole()
+						: null);
+
+		data.put(
+				"roleName",
+				user.getRole() != null
+						? user.getRole().getNameRole()
+						: null);
+
+		data.put("defaultAddressId", defaultAddressId);
+		data.put("status", user.getStatus());
+		data.put("lastLogin", user.getLastLogin());
+		data.put("createdAt", user.getCreatedAt());
+		data.put("updatedAt", user.getUpdatedAt());
+		data.put("deletedAt", user.getDeletedAt());
+
+		return data;
+	}
+
+	private Map<String, Object> toExportAddress(
+			UserAddress address,
+			String idUser,
+			Long defaultAddressId) {
+
+		Map<String, Object> data = new LinkedHashMap<>();
+
+		data.put("addressId", address.getAddressId());
+		data.put("idUser", idUser);
+		data.put("companyName", address.getCompanyName());
+		data.put("address", address.getAddress());
+		data.put("note", address.getNote());
+
+		data.put(
+				"isDefault",
+				defaultAddressId != null
+						&& defaultAddressId.equals(
+								address.getAddressId()));
+
+		data.put("createdAt", address.getCreatedAt());
+		data.put("updatedAt", address.getUpdatedAt());
+		data.put("deletedAt", address.getDeletedAt());
+
+		return data;
+	}
+
+	private Map<String, Object> toExportAuthProvider(
+			UserAuthProvider provider,
+			String idUser) {
+
+		Map<String, Object> data = new LinkedHashMap<>();
+
+		data.put("id", provider.getId());
+		data.put("idUser", idUser);
+		data.put("provider", provider.getProvider());
+		data.put("email", provider.getEmail());
+		data.put("phone", provider.getPhone());
+		data.put("providerId", provider.getProviderId());
+		data.put("emailVerifiedAt", provider.getEmailVerifiedAt());
+		data.put("phoneVerifiedAt", provider.getPhoneVerifiedAt());
+		data.put("createdAt", provider.getCreatedAt());
+		data.put("updatedAt", provider.getUpdatedAt());
+		data.put("deletedAt", provider.getDeletedAt());
+
+		return data;
+	}
+
 	@Override
+	@Transactional
 	public Map<String, Object> deleteAccount(String idUser) {
-		User user = repository.findById(idUser).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+		if (idUser == null || idUser.isBlank()) {
+			throw new RuntimeException("Bạn chưa đăng nhập");
+		}
+
+		User user = repository
+				.findByIdUserAndDeletedAtIsNull(idUser)
+				.orElseThrow(() -> new RuntimeException(
+						"Tài khoản không tồn tại hoặc đã được xóa"));
 
 		LocalDateTime now = LocalDateTime.now();
 
-		// Soft delete user
 		user.setDeletedAt(now);
 		user.setUpdatedAt(now);
 		user.setStatus("delete");
-		user.setDefaultAddress(null);
 
-		// Soft delete auth providers
-		List<UserAuthProvider> authProviders = authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
+		List<UserAuthProvider> authProviders =
+				authProviderRepository
+						.findByUser_IdUserAndDeletedAtIsNull(idUser);
 
 		authProviders.forEach(provider -> {
 			provider.setDeletedAt(now);
 			provider.setUpdatedAt(now);
 		});
 
-		// Soft delete addresses
-		List<UserAddress> addresses = addressRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
-
-		addresses.forEach(address -> {
-			address.setDeletedAt(now);
-			address.setUpdatedAt(now);
-		});
-
 		authProviderRepository.saveAll(authProviders);
-		addressRepository.saveAll(addresses);
 		repository.save(user);
 
-		return Map.of("message", "Tài khoản đã được xóa", "status", user.getStatus(), "deletedAt", user.getDeletedAt());
+		return Map.of(
+				"message", "Tài khoản đã được đóng",
+				"status", user.getStatus(),
+				"deletedAt", user.getDeletedAt());
 	}
 }

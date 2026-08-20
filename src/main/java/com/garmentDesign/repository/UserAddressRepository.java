@@ -12,6 +12,8 @@ import com.garmentDesign.entity.UserAddress;
 public interface UserAddressRepository extends JpaRepository<UserAddress, Long> {
 
 	List<UserAddress> findByUser_IdUserAndDeletedAtIsNull(String idUser);
+	
+	List<UserAddress> findByUser_IdUserOrderByCreatedAtAsc(String idUser);
 
 	Optional<UserAddress> findByUser_IdUserAndCompanyNameIgnoreCaseAndAddressIgnoreCase(String idUser,
 			String companyName, String address);
