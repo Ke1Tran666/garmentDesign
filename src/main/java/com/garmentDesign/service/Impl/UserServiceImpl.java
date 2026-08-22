@@ -777,30 +777,15 @@ public class UserServiceImpl implements UserService {
 	@Transactional(readOnly = true)
 	public Map<String, Object> exportUserData(String idUser) {
 
-		User user = repository.findById(idUser)
-				.orElseThrow(() -> new RuntimeException(
-						"Không tìm thấy người dùng"));
+		User user = repository.findById(idUser).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
-		Long defaultAddressId = user.getDefaultAddress() != null
-				? user.getDefaultAddress().getAddressId()
-				: null;
+		Long defaultAddressId = user.getDefaultAddress() != null ? user.getDefaultAddress().getAddressId() : null;
 
-		List<Map<String, Object>> addresses = addressRepository
-				.findByUser_IdUserOrderByCreatedAtAsc(idUser)
-				.stream()
-				.map(address -> toExportAddress(
-						address,
-						idUser,
-						defaultAddressId))
-				.toList();
+		List<Map<String, Object>> addresses = addressRepository.findByUser_IdUserOrderByCreatedAtAsc(idUser).stream()
+				.map(address -> toExportAddress(address, idUser, defaultAddressId)).toList();
 
-		List<Map<String, Object>> authProviders = authProviderRepository
-				.findByUser_IdUserOrderByCreatedAtAsc(idUser)
-				.stream()
-				.map(provider -> toExportAuthProvider(
-						provider,
-						idUser))
-				.toList();
+		List<Map<String, Object>> authProviders = authProviderRepository.findByUser_IdUserOrderByCreatedAtAsc(idUser)
+				.stream().map(provider -> toExportAuthProvider(provider, idUser)).toList();
 
 		Map<String, Object> result = new LinkedHashMap<>();
 
@@ -811,9 +796,7 @@ public class UserServiceImpl implements UserService {
 		return result;
 	}
 
-	private Map<String, Object> toExportUser(
-			User user,
-			Long defaultAddressId) {
+	private Map<String, Object> toExportUser(User user, Long defaultAddressId) {
 
 		Map<String, Object> data = new LinkedHashMap<>();
 
@@ -824,17 +807,9 @@ public class UserServiceImpl implements UserService {
 		data.put("gender", user.getGender());
 		data.put("birthday", user.getBirthday());
 
-		data.put(
-				"roleId",
-				user.getRole() != null
-						? user.getRole().getIdRole()
-						: null);
+		data.put("roleId", user.getRole() != null ? user.getRole().getIdRole() : null);
 
-		data.put(
-				"roleName",
-				user.getRole() != null
-						? user.getRole().getNameRole()
-						: null);
+		data.put("roleName", user.getRole() != null ? user.getRole().getNameRole() : null);
 
 		data.put("defaultAddressId", defaultAddressId);
 		data.put("status", user.getStatus());
@@ -846,10 +821,7 @@ public class UserServiceImpl implements UserService {
 		return data;
 	}
 
-	private Map<String, Object> toExportAddress(
-			UserAddress address,
-			String idUser,
-			Long defaultAddressId) {
+	private Map<String, Object> toExportAddress(UserAddress address, String idUser, Long defaultAddressId) {
 
 		Map<String, Object> data = new LinkedHashMap<>();
 
@@ -859,11 +831,7 @@ public class UserServiceImpl implements UserService {
 		data.put("address", address.getAddress());
 		data.put("note", address.getNote());
 
-		data.put(
-				"isDefault",
-				defaultAddressId != null
-						&& defaultAddressId.equals(
-								address.getAddressId()));
+		data.put("isDefault", defaultAddressId != null && defaultAddressId.equals(address.getAddressId()));
 
 		data.put("createdAt", address.getCreatedAt());
 		data.put("updatedAt", address.getUpdatedAt());
@@ -872,9 +840,7 @@ public class UserServiceImpl implements UserService {
 		return data;
 	}
 
-	private Map<String, Object> toExportAuthProvider(
-			UserAuthProvider provider,
-			String idUser) {
+	private Map<String, Object> toExportAuthProvider(UserAuthProvider provider, String idUser) {
 
 		Map<String, Object> data = new LinkedHashMap<>();
 
@@ -901,10 +867,8 @@ public class UserServiceImpl implements UserService {
 			throw new RuntimeException("Bạn chưa đăng nhập");
 		}
 
-		User user = repository
-				.findByIdUserAndDeletedAtIsNull(idUser)
-				.orElseThrow(() -> new RuntimeException(
-						"Tài khoản không tồn tại hoặc đã được xóa"));
+		User user = repository.findByIdUserAndDeletedAtIsNull(idUser)
+				.orElseThrow(() -> new RuntimeException("Tài khoản không tồn tại hoặc đã được xóa"));
 
 		LocalDateTime now = LocalDateTime.now();
 
@@ -912,9 +876,7 @@ public class UserServiceImpl implements UserService {
 		user.setUpdatedAt(now);
 		user.setStatus("delete");
 
-		List<UserAuthProvider> authProviders =
-				authProviderRepository
-						.findByUser_IdUserAndDeletedAtIsNull(idUser);
+		List<UserAuthProvider> authProviders = authProviderRepository.findByUser_IdUserAndDeletedAtIsNull(idUser);
 
 		authProviders.forEach(provider -> {
 			provider.setDeletedAt(now);
@@ -924,9 +886,7 @@ public class UserServiceImpl implements UserService {
 		authProviderRepository.saveAll(authProviders);
 		repository.save(user);
 
-		return Map.of(
-				"message", "Tài khoản đã được đóng",
-				"status", user.getStatus(),
-				"deletedAt", user.getDeletedAt());
+		return Map.of("message", "Tài khoản đã được đóng", "status", user.getStatus(), "deletedAt",
+				user.getDeletedAt());
 	}
 }
