@@ -30,9 +30,7 @@ public class UserController {
 	private final UserService service;
 	private final UserSessionService userSessionService;
 
-	public UserController(
-			UserService service,
-			UserSessionService userSessionService) {
+	public UserController(UserService service, UserSessionService userSessionService) {
 
 		this.service = service;
 		this.userSessionService = userSessionService;
@@ -50,8 +48,9 @@ public class UserController {
 
 	@GetMapping("/{id}")
 	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-	public User getById(@PathVariable String id) {
-		return service.findById(id);
+	public ResponseEntity<?> getById(@PathVariable String id) {
+
+		return ResponseEntity.ok(service.getProfile(id));
 	}
 
 	@PostMapping
@@ -62,8 +61,7 @@ public class UserController {
 
 	@DeleteMapping("/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<Void> delete(
-			@PathVariable String id) {
+	public ResponseEntity<Void> delete(@PathVariable String id) {
 
 		service.delete(id);
 
@@ -112,19 +110,15 @@ public class UserController {
 	}
 
 	@DeleteMapping("/me/delete-account")
-	public ResponseEntity<?> deleteAccount(
-			Authentication authentication,
-			HttpServletRequest request) {
+	public ResponseEntity<?> deleteAccount(Authentication authentication, HttpServletRequest request) {
 
 		String idUser = authentication.getName();
 
-		Map<String, Object> result =
-				service.deleteAccount(idUser);
+		Map<String, Object> result = service.deleteAccount(idUser);
 
 		userSessionService.expireAllSessions(idUser);
 
-		HttpSession currentSession =
-				request.getSession(false);
+		HttpSession currentSession = request.getSession(false);
 
 		if (currentSession != null) {
 			currentSession.invalidate();
