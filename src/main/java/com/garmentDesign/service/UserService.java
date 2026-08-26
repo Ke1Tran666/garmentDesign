@@ -30,4 +30,6 @@ public interface UserService {
 	Map<String, Object> deleteAccount(String idUser);
 
 	Map<String, Object> deletePhone(String idUser, Long providerId);
+
+	Map<String, Object> updatePhone(String idUser, String phone);
 }
