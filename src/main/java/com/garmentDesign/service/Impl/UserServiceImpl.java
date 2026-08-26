@@ -889,4 +889,34 @@ public class UserServiceImpl implements UserService {
 		return Map.of("message", "Tài khoản đã được đóng", "status", user.getStatus(), "deletedAt",
 				user.getDeletedAt());
 	}
+
+	@Override
+	@Transactional
+	public Map<String, Object> updatePhone(String idUser, String phone) {
+
+		if (phone == null || phone.isBlank()) {
+			throw new RuntimeException("Vui lòng nhập số điện thoại");
+		}
+
+		User user = findById(idUser);
+
+		updateProfilePhone(user, phone);
+
+		User refreshedUser = userStatusService.refreshStatus(user);
+
+		UserAuthProvider phoneProvider = authProviderRepository
+				.findByUser_IdUserAndProviderAndDeletedAtIsNull(idUser, "phone").orElse(null);
+
+		Map<String, Object> result = new HashMap<>();
+
+		result.put("message", "Cập nhật số điện thoại thành công");
+
+		result.put("phone", phoneProvider != null ? phoneProvider.getPhone() : null);
+
+		result.put("phoneVerifiedAt", phoneProvider != null ? phoneProvider.getPhoneVerifiedAt() : null);
+
+		result.put("status", refreshedUser.getStatus());
+
+		return result;
+	}
 }

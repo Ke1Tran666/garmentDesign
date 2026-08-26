@@ -52,40 +52,26 @@ public class UserController {
 
 		return ResponseEntity.ok(service.getProfile(id));
 	}
-	
+
 	@PutMapping("/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<?> updateById(
-	        @PathVariable String id,
-	        @RequestBody UpdateProfileRequest request) {
+	public ResponseEntity<?> updateById(@PathVariable String id, @RequestBody UpdateProfileRequest request) {
 
-	    return ResponseEntity.ok(
-	            service.updateProfile(id, request)
-	    );
+		return ResponseEntity.ok(service.updateProfile(id, request));
 	}
 
-	@PutMapping(
-	        value = "/{id}/avatar",
-	        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-	)
+	@PutMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<?> uploadAvatarById(
-	        @PathVariable String id,
-	        @RequestParam("file") MultipartFile file) {
+	public ResponseEntity<?> uploadAvatarById(@PathVariable String id, @RequestParam("file") MultipartFile file) {
 
-	    return ResponseEntity.ok(
-	            service.uploadAvatar(id, file)
-	    );
+		return ResponseEntity.ok(service.uploadAvatar(id, file));
 	}
 
 	@DeleteMapping("/{id}/avatar")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<?> deleteAvatarById(
-	        @PathVariable String id) {
+	public ResponseEntity<?> deleteAvatarById(@PathVariable String id) {
 
-	    return ResponseEntity.ok(
-	            service.deleteAvatar(id)
-	    );
+		return ResponseEntity.ok(service.deleteAvatar(id));
 	}
 
 	@PostMapping
@@ -168,5 +154,12 @@ public class UserController {
 	public ResponseEntity<?> deletePhone(Authentication authentication, @PathVariable Long providerId) {
 
 		return ResponseEntity.ok(service.deletePhone(authentication.getName(), providerId));
+	}
+
+	@PutMapping("/{id}/phone")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> updatePhoneById(@PathVariable String id, @RequestBody Map<String, String> body) {
+
+		return ResponseEntity.ok(service.updatePhone(id, body.get("phone")));
 	}
 }
