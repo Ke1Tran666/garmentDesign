@@ -1,16 +1,23 @@
 package com.garmentDesign.service;
 
-import com.garmentDesign.entity.Service;
 import java.util.List;
 
+import com.garmentDesign.dto.service.ServiceUpsertRequest;
+import com.garmentDesign.entity.Service;
+
 public interface ServiceService {
+
+	List<Service> findPublicServices();
+
+	Service findPublicById(Long id);
+
 	List<Service> findAll();
 
 	Service findById(Long id);
 
-	Service save(Service data);
+	Service create(ServiceUpsertRequest request);
 
-	Service update(Long id, Service data);
+	Service update(Long id, ServiceUpsertRequest request);
 
-	void delete(Long id);
+	Service delete(Long id);
 }
