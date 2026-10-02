@@ -16,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, String> {
 	Optional<User> findByIdUserAndDeletedAtIsNull(String idUser);
 
 	boolean existsByUserCodeEndingWithIgnoreCase(String storageCode);
+
+	long countByRole_NameRoleIgnoreCaseAndDeletedAtIsNull(String roleName);
 }

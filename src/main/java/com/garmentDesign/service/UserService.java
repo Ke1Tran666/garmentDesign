@@ -32,4 +32,8 @@ public interface UserService {
 	Map<String, Object> deletePhone(String idUser, Long providerId);
 
 	Map<String, Object> updatePhone(String idUser, String phone);
+
+	void validateManagementPermission(String actorId, String targetId);
+
+	Map<String, Object> updateRole(String idUser, Long roleId);
 }
