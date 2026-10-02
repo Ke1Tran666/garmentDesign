@@ -41,6 +41,11 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.util.LinkedHashMap;
 
+import org.springframework.security.access.AccessDeniedException;
+
+import com.garmentDesign.entity.Role;
+import com.garmentDesign.repository.RoleRepository;
+
 @Service
 public class UserServiceImpl implements UserService {
 	private final UserRepository repository;
@@ -49,6 +54,7 @@ public class UserServiceImpl implements UserService {
 	private final PasswordService passwordService;
 	private final UserStatusService userStatusService;
 	private final UserSessionService userSessionService;
+	private final RoleRepository roleRepository;
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(UserServiceImpl.class);
 
@@ -62,14 +68,14 @@ public class UserServiceImpl implements UserService {
 	private final String publicBaseUrl;
 
 	public UserServiceImpl(UserRepository repository, UserAuthProviderRepository authProviderRepository,
-			UserAddressRepository addressRepository, PasswordService passwordService,
+			UserAddressRepository addressRepository, RoleRepository roleRepository, PasswordService passwordService,
 			UserStatusService userStatusService, UserSessionService userSessionService,
 			@Value("${app.upload.root-dir:uploads}") String uploadRoot,
 			@Value("${app.public-base-url:http://localhost:8082}") String publicBaseUrl) {
-
 		this.repository = repository;
 		this.authProviderRepository = authProviderRepository;
 		this.addressRepository = addressRepository;
+		this.roleRepository = roleRepository;
 		this.passwordService = passwordService;
 		this.userStatusService = userStatusService;
 		this.userSessionService = userSessionService;
@@ -918,5 +924,112 @@ public class UserServiceImpl implements UserService {
 		result.put("status", refreshedUser.getStatus());
 
 		return result;
+	}
+
+	private String normalizeRoleName(User user) {
+
+		if (user == null || user.getRole() == null) {
+			return "";
+		}
+
+		String roleName = user.getRole().getNameRole();
+
+		if (roleName == null) {
+			return "";
+		}
+
+		return roleName.trim().toUpperCase(Locale.ROOT);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public void validateManagementPermission(String actorId, String targetId) {
+
+		if (actorId == null || actorId.isBlank()) {
+			throw new AccessDeniedException("Bạn chưa đăng nhập");
+		}
+
+		if (targetId == null || targetId.isBlank()) {
+			throw new RuntimeException("Người dùng cần chỉnh sửa không hợp lệ");
+		}
+
+		User actor = repository.findByIdUserAndDeletedAtIsNull(actorId)
+				.orElseThrow(() -> new AccessDeniedException("Tài khoản đăng nhập không tồn tại hoặc đã bị xóa"));
+
+		User target = repository.findByIdUserAndDeletedAtIsNull(targetId)
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+		String actorRole = normalizeRoleName(actor);
+		String targetRole = normalizeRoleName(target);
+
+		/*
+		 * Admin được chỉnh sửa tất cả người dùng.
+		 */
+		if ("ADMIN".equals(actorRole)) {
+			return;
+		}
+
+		/*
+		 * Staff chỉ được chỉnh: - chính tài khoản của mình; - tài khoản có vai trò
+		 * USER.
+		 */
+		boolean staffCanEdit = "STAFF".equals(actorRole) && (actorId.equals(targetId) || "USER".equals(targetRole));
+
+		if (!staffCanEdit) {
+			throw new AccessDeniedException("Bạn không có quyền chỉnh sửa người dùng này");
+		}
+	}
+
+	@Override
+	@Transactional
+	public Map<String, Object> updateRole(String idUser, Long roleId) {
+
+		if (idUser == null || idUser.isBlank()) {
+			throw new RuntimeException("Người dùng không hợp lệ");
+		}
+
+		if (roleId == null) {
+			throw new RuntimeException("Vui lòng chọn vai trò");
+		}
+
+		User user = repository.findByIdUserAndDeletedAtIsNull(idUser)
+				.orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+		Role nextRole = roleRepository.findById(roleId)
+				.orElseThrow(() -> new RuntimeException("Vai trò không tồn tại"));
+
+		String currentRoleName = normalizeRoleName(user);
+
+		String nextRoleName = nextRole.getNameRole() == null ? ""
+				: nextRole.getNameRole().trim().toUpperCase(Locale.ROOT);
+
+		if (nextRoleName.isBlank()) {
+			throw new RuntimeException("Vai trò không hợp lệ");
+		}
+
+		/*
+		 * Không cập nhật nếu vai trò không thay đổi.
+		 */
+		if (user.getRole() != null && roleId.equals(user.getRole().getIdRole())) {
+			return Map.of("message", "Vai trò không thay đổi", "role", nextRole);
+		}
+
+		/*
+		 * Không cho hạ quyền Admin cuối cùng của hệ thống.
+		 */
+		if ("ADMIN".equals(currentRoleName) && !"ADMIN".equals(nextRoleName)) {
+			long adminCount = repository.countByRole_NameRoleIgnoreCaseAndDeletedAtIsNull("ADMIN");
+
+			if (adminCount <= 1) {
+				throw new RuntimeException("Không thể thay đổi vai trò của quản trị viên cuối cùng");
+			}
+		}
+
+		user.setRole(nextRole);
+		user.setUpdatedAt(LocalDateTime.now());
+
+		repository.saveAndFlush(user);
+
+		return Map.of("message", "Cập nhật vai trò thành công", "role", nextRole);
 	}
 }
