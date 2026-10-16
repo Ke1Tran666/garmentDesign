@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.garmentDesign.dto.user.CreateUserRequest;
 import com.garmentDesign.dto.user.UpdateProfileRequest;
 import com.garmentDesign.entity.User;
 import com.garmentDesign.service.UserService;
@@ -56,8 +57,10 @@ public class UserController {
 
 	@PostMapping
 	@PreAuthorize("hasRole('ADMIN')")
-	public User create(@RequestBody User data) {
-		return service.save(data);
+	public ResponseEntity<User> create(
+			@RequestBody CreateUserRequest request
+	) {
+		return ResponseEntity.ok(service.create(request));
 	}
 
 	@DeleteMapping("/{id}")

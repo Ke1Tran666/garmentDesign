@@ -4,6 +4,8 @@ import com.garmentDesign.entity.User;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.garmentDesign.dto.user.CreateUserRequest;
 import com.garmentDesign.dto.user.UpdateProfileRequest;
 
 public interface UserService {
@@ -11,7 +13,7 @@ public interface UserService {
 
 	User findById(String id);
 
-	User save(User data);
+	User create(CreateUserRequest request);
 
 	User updateProfile(String id, UpdateProfileRequest request);
 

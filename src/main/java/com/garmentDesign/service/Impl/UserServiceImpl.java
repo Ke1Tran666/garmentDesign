@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.garmentDesign.dto.user.CreateUserRequest;
 import com.garmentDesign.dto.user.UpdateProfileRequest;
 import com.garmentDesign.entity.User;
 import com.garmentDesign.entity.UserAddress;
@@ -510,8 +511,161 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
-	public User save(User data) {
-		return repository.save(data);
+	@Transactional
+	public User create(CreateUserRequest request) {
+
+		if (request == null) {
+			throw new RuntimeException("Thông tin người dùng không hợp lệ");
+		}
+
+		String fullName = request.getFullName() == null
+				? ""
+				: request.getFullName().trim();
+
+		if (fullName.isEmpty()) {
+			throw new RuntimeException("Họ và tên không được để trống");
+		}
+
+		if (fullName.length() > 100) {
+			throw new RuntimeException("Họ và tên không được vượt quá 100 ký tự");
+		}
+
+		String email = request.getEmail() == null
+				? ""
+				: request.getEmail().trim().toLowerCase(Locale.ROOT);
+
+		if (email.isEmpty()) {
+			throw new RuntimeException("Email không được để trống");
+		}
+
+		if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+			throw new RuntimeException("Email không hợp lệ");
+		}
+
+		/*
+		 * Kiểm tra cả provider đang hoạt động và provider đã xóa mềm.
+		 */
+		List<UserAuthProvider> existingProviders =
+				authProviderRepository.findAllByEmailIgnoreCase(email);
+
+		if (!existingProviders.isEmpty()) {
+			boolean hasActiveProvider = existingProviders.stream()
+					.anyMatch(provider -> provider.getDeletedAt() == null
+							&& provider.getUser() != null
+							&& !"delete".equalsIgnoreCase(
+									provider.getUser().getStatus()
+							));
+
+			if (hasActiveProvider) {
+				throw new RuntimeException("Email đã được sử dụng");
+			}
+
+			throw new RuntimeException(
+					"Email này thuộc một tài khoản đã bị xóa"
+			);
+		}
+
+		passwordService.validateNewPassword(request.getPassword());
+
+		String gender = request.getGender() == null
+				? "Unknown"
+				: request.getGender().trim();
+
+		if ("Male".equalsIgnoreCase(gender)) {
+			gender = "Male";
+		} else if ("Female".equalsIgnoreCase(gender)) {
+			gender = "Female";
+		} else if ("Unknown".equalsIgnoreCase(gender)) {
+			gender = "Unknown";
+		} else {
+			throw new RuntimeException("Giới tính không hợp lệ");
+		}
+
+		LocalDate birthday = request.getBirthday();
+
+		if (birthday == null) {
+			throw new RuntimeException("Ngày sinh không được để trống");
+		}
+
+		if (!birthday.isBefore(LocalDate.now())) {
+			throw new RuntimeException(
+					"Ngày sinh phải nhỏ hơn ngày hiện tại"
+			);
+		}
+
+		if (request.getRoleId() == null) {
+			throw new RuntimeException("Vai trò không được để trống");
+		}
+
+		Role role = roleRepository.findById(request.getRoleId())
+				.orElseThrow(() -> new RuntimeException("Vai trò không tồn tại"));
+
+		/*
+		 * Kiểm tra và chuẩn hóa số điện thoại trước khi lưu User.
+		 */
+		String normalizedPhone = normalizeProfilePhone(request.getPhone());
+
+		String idUser = generateUniqueUserId();
+
+		String userCode = generateUserCode(
+				fullName,
+				gender,
+				birthday,
+				null,
+				idUser
+		);
+
+		User user = new User();
+		user.setIdUser(idUser);
+		user.setUserCode(userCode);
+		user.setFullName(fullName);
+		user.setGender(gender);
+		user.setBirthday(birthday);
+		user.setRole(role);
+
+		/*
+		 * Email và số điện thoại mới tạo chưa được xác thực nên tài khoản
+		 * giữ trạng thái pending.
+		 */
+		user.setStatus("pending");
+
+		user = repository.save(user);
+
+		UserAuthProvider localProvider = new UserAuthProvider();
+		localProvider.setUser(user);
+		localProvider.setProvider("local");
+		localProvider.setEmail(email);
+		localProvider.setPassword(
+				passwordService.encode(request.getPassword())
+		);
+		localProvider.setEmailVerifiedAt(null);
+		localProvider.setDeletedAt(null);
+
+		authProviderRepository.save(localProvider);
+
+		if (normalizedPhone != null) {
+			updateProfilePhone(user, normalizedPhone);
+		}
+
+		return user;
+	}
+
+	private String generateUniqueUserId() {
+
+		for (int attempt = 0; attempt < 100; attempt++) {
+			int numericId = Math.floorMod(
+					UUID.randomUUID().hashCode(),
+					100000
+			);
+
+			String idUser = String.format("%05d", numericId);
+
+			if (!repository.existsById(idUser)) {
+				return idUser;
+			}
+		}
+
+		throw new RuntimeException("Không thể tạo mã người dùng duy nhất");
 	}
 
 	@Override
