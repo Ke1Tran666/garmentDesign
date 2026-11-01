@@ -518,9 +518,7 @@ public class UserServiceImpl implements UserService {
 			throw new RuntimeException("Thông tin người dùng không hợp lệ");
 		}
 
-		String fullName = request.getFullName() == null
-				? ""
-				: request.getFullName().trim();
+		String fullName = request.getFullName() == null ? "" : request.getFullName().trim();
 
 		if (fullName.isEmpty()) {
 			throw new RuntimeException("Họ và tên không được để trống");
@@ -530,9 +528,7 @@ public class UserServiceImpl implements UserService {
 			throw new RuntimeException("Họ và tên không được vượt quá 100 ký tự");
 		}
 
-		String email = request.getEmail() == null
-				? ""
-				: request.getEmail().trim().toLowerCase(Locale.ROOT);
+		String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase(Locale.ROOT);
 
 		if (email.isEmpty()) {
 			throw new RuntimeException("Email không được để trống");
@@ -545,31 +541,22 @@ public class UserServiceImpl implements UserService {
 		/*
 		 * Kiểm tra cả provider đang hoạt động và provider đã xóa mềm.
 		 */
-		List<UserAuthProvider> existingProviders =
-				authProviderRepository.findAllByEmailIgnoreCase(email);
+		List<UserAuthProvider> existingProviders = authProviderRepository.findAllByEmailIgnoreCase(email);
 
 		if (!existingProviders.isEmpty()) {
-			boolean hasActiveProvider = existingProviders.stream()
-					.anyMatch(provider -> provider.getDeletedAt() == null
-							&& provider.getUser() != null
-							&& !"delete".equalsIgnoreCase(
-									provider.getUser().getStatus()
-							));
+			boolean hasActiveProvider = existingProviders.stream().anyMatch(provider -> provider.getDeletedAt() == null
+					&& provider.getUser() != null && !"delete".equalsIgnoreCase(provider.getUser().getStatus()));
 
 			if (hasActiveProvider) {
 				throw new RuntimeException("Email đã được sử dụng");
 			}
 
-			throw new RuntimeException(
-					"Email này thuộc một tài khoản đã bị xóa"
-			);
+			throw new RuntimeException("Email này thuộc một tài khoản đã bị xóa");
 		}
 
 		passwordService.validateNewPassword(request.getPassword());
 
-		String gender = request.getGender() == null
-				? "Unknown"
-				: request.getGender().trim();
+		String gender = request.getGender() == null ? "Unknown" : request.getGender().trim();
 
 		if ("Male".equalsIgnoreCase(gender)) {
 			gender = "Male";
@@ -588,9 +575,7 @@ public class UserServiceImpl implements UserService {
 		}
 
 		if (!birthday.isBefore(LocalDate.now())) {
-			throw new RuntimeException(
-					"Ngày sinh phải nhỏ hơn ngày hiện tại"
-			);
+			throw new RuntimeException("Ngày sinh phải nhỏ hơn ngày hiện tại");
 		}
 
 		if (request.getRoleId() == null) {
@@ -607,13 +592,7 @@ public class UserServiceImpl implements UserService {
 
 		String idUser = generateUniqueUserId();
 
-		String userCode = generateUserCode(
-				fullName,
-				gender,
-				birthday,
-				null,
-				idUser
-		);
+		String userCode = generateUserCode(fullName, gender, birthday, null, idUser);
 
 		User user = new User();
 		user.setIdUser(idUser);
@@ -624,8 +603,8 @@ public class UserServiceImpl implements UserService {
 		user.setRole(role);
 
 		/*
-		 * Email và số điện thoại mới tạo chưa được xác thực nên tài khoản
-		 * giữ trạng thái pending.
+		 * Email và số điện thoại mới tạo chưa được xác thực nên tài khoản giữ trạng
+		 * thái pending.
 		 */
 		user.setStatus("pending");
 
@@ -635,9 +614,7 @@ public class UserServiceImpl implements UserService {
 		localProvider.setUser(user);
 		localProvider.setProvider("local");
 		localProvider.setEmail(email);
-		localProvider.setPassword(
-				passwordService.encode(request.getPassword())
-		);
+		localProvider.setPassword(passwordService.encode(request.getPassword()));
 		localProvider.setEmailVerifiedAt(null);
 		localProvider.setDeletedAt(null);
 
@@ -653,10 +630,7 @@ public class UserServiceImpl implements UserService {
 	private String generateUniqueUserId() {
 
 		for (int attempt = 0; attempt < 100; attempt++) {
-			int numericId = Math.floorMod(
-					UUID.randomUUID().hashCode(),
-					100000
-			);
+			int numericId = Math.floorMod(UUID.randomUUID().hashCode(), 100000);
 
 			String idUser = String.format("%05d", numericId);
 

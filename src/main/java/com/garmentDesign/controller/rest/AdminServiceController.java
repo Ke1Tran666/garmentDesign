@@ -40,16 +40,13 @@ public class AdminServiceController {
 
 	@PostMapping
 	@PreAuthorize("hasRole('ADMIN')")
-	public Service create(
-			@RequestBody ServiceUpsertRequest request) {
+	public Service create(@RequestBody ServiceUpsertRequest request) {
 		return service.create(request);
 	}
 
 	@PutMapping("/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
-	public Service update(
-			@PathVariable Long id,
-			@RequestBody ServiceUpsertRequest request) {
+	public Service update(@PathVariable Long id, @RequestBody ServiceUpsertRequest request) {
 		return service.update(id, request);
 	}
 

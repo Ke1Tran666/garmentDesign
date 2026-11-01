@@ -24,11 +24,9 @@ public class UserAddressController {
 	private final UserAddressService service;
 	private final UserService userService;
 
-	public UserAddressController(
-	        UserAddressService service,
-	        UserService userService) {
-	    this.service = service;
-	    this.userService = userService;
+	public UserAddressController(UserAddressService service, UserService userService) {
+		this.service = service;
+		this.userService = userService;
 	}
 
 	@GetMapping
@@ -73,18 +71,14 @@ public class UserAddressController {
 
 		return ResponseEntity.noContent().build();
 	}
-	
+
 	@PostMapping("/users/{userId}")
 	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
-	public UserAddress createForUser(
-	        Authentication authentication,
-	        @PathVariable String userId,
-	        @RequestBody UserAddress data) {
+	public UserAddress createForUser(Authentication authentication, @PathVariable String userId,
+			@RequestBody UserAddress data) {
 
-	    userService.validateManagementPermission(
-	            authentication.getName(),
-	            userId);
+		userService.validateManagementPermission(authentication.getName(), userId);
 
-	    return service.createByUser(userId, data);
+		return service.createByUser(userId, data);
 	}
 }
