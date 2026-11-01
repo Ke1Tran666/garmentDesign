@@ -4,6 +4,8 @@ import com.garmentDesign.entity.User;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.garmentDesign.dto.user.CreateUserRequest;
 import com.garmentDesign.dto.user.UpdateProfileRequest;
 
 public interface UserService {
@@ -11,7 +13,7 @@ public interface UserService {
 
 	User findById(String id);
 
-	User save(User data);
+	User create(CreateUserRequest request);
 
 	User updateProfile(String id, UpdateProfileRequest request);
 
@@ -32,4 +34,8 @@ public interface UserService {
 	Map<String, Object> deletePhone(String idUser, Long providerId);
 
 	Map<String, Object> updatePhone(String idUser, String phone);
+
+	void validateManagementPermission(String actorId, String targetId);
+
+	Map<String, Object> updateRole(String idUser, Long roleId);
 }

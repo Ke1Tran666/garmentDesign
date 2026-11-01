@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.garmentDesign.dto.user.CreateUserRequest;
 import com.garmentDesign.dto.user.UpdateProfileRequest;
 import com.garmentDesign.entity.User;
 import com.garmentDesign.service.UserService;
@@ -22,6 +23,7 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.garmentDesign.service.UserSessionService;
+import com.garmentDesign.dto.user.UpdateUserRoleRequest;
 
 @RestController
 @RequestMapping("/api/users")
@@ -53,31 +55,12 @@ public class UserController {
 		return ResponseEntity.ok(service.getProfile(id));
 	}
 
-	@PutMapping("/{id}")
-	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<?> updateById(@PathVariable String id, @RequestBody UpdateProfileRequest request) {
-
-		return ResponseEntity.ok(service.updateProfile(id, request));
-	}
-
-	@PutMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<?> uploadAvatarById(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-
-		return ResponseEntity.ok(service.uploadAvatar(id, file));
-	}
-
-	@DeleteMapping("/{id}/avatar")
-	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<?> deleteAvatarById(@PathVariable String id) {
-
-		return ResponseEntity.ok(service.deleteAvatar(id));
-	}
-
 	@PostMapping
 	@PreAuthorize("hasRole('ADMIN')")
-	public User create(@RequestBody User data) {
-		return service.save(data);
+	public ResponseEntity<User> create(
+			@RequestBody CreateUserRequest request
+	) {
+		return ResponseEntity.ok(service.create(request));
 	}
 
 	@DeleteMapping("/{id}")
@@ -156,10 +139,48 @@ public class UserController {
 		return ResponseEntity.ok(service.deletePhone(authentication.getName(), providerId));
 	}
 
+	@PutMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ResponseEntity<?> updateById(@PathVariable String id, @RequestBody UpdateProfileRequest request,
+			Authentication authentication) {
+		service.validateManagementPermission(authentication.getName(), id);
+
+		return ResponseEntity.ok(service.updateProfile(id, request));
+	}
+
+	@PutMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ResponseEntity<?> uploadAvatarById(@PathVariable String id, @RequestParam("file") MultipartFile file,
+			Authentication authentication) {
+		service.validateManagementPermission(authentication.getName(), id);
+
+		return ResponseEntity.ok(service.uploadAvatar(id, file));
+	}
+
+	@DeleteMapping("/{id}/avatar")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ResponseEntity<?> deleteAvatarById(@PathVariable String id, Authentication authentication) {
+		service.validateManagementPermission(authentication.getName(), id);
+
+		return ResponseEntity.ok(service.deleteAvatar(id));
+	}
+
 	@PutMapping("/{id}/phone")
-	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<?> updatePhoneById(@PathVariable String id, @RequestBody Map<String, String> body) {
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ResponseEntity<?> updatePhoneById(@PathVariable String id, @RequestBody Map<String, String> body,
+			Authentication authentication) {
+		service.validateManagementPermission(authentication.getName(), id);
 
 		return ResponseEntity.ok(service.updatePhone(id, body.get("phone")));
+	}
+
+	@PutMapping("/{id}/role")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> updateRole(@PathVariable String id, @RequestBody UpdateUserRoleRequest request) {
+		Map<String, Object> result = service.updateRole(id, request.roleId());
+
+		userSessionService.expireAllSessions(id);
+
+		return ResponseEntity.ok(result);
 	}
 }

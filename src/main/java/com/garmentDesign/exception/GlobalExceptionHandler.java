@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.access.AccessDeniedException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -64,5 +65,17 @@ public class GlobalExceptionHandler {
 		response.put("path", request.getRequestURI());
 
 		return ResponseEntity.status(status).body(response);
+	}
+
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException exception,
+			HttpServletRequest request) {
+		String message = exception.getMessage();
+
+		if (message == null || message.isBlank()) {
+			message = "Bạn không có quyền thực hiện thao tác này";
+		}
+
+		return buildResponse(HttpStatus.FORBIDDEN, message, request);
 	}
 }
