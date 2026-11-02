@@ -57,9 +57,7 @@ public class UserController {
 
 	@PostMapping
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<User> create(
-			@RequestBody CreateUserRequest request
-	) {
+	public ResponseEntity<User> create(@RequestBody CreateUserRequest request) {
 		return ResponseEntity.ok(service.create(request));
 	}
 

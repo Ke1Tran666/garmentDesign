@@ -121,9 +121,7 @@ public class SecurityConfig {
 						/*
 						 * Các endpoint còn lại phải đăng nhập
 						 */
-						.requestMatchers("/api/admin/**")
-						.hasAnyRole("ADMIN", "STAFF")
-						.anyRequest().authenticated())
+						.requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF").anyRequest().authenticated())
 
 				.exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) -> {
 					response.setStatus(HttpStatus.UNAUTHORIZED.value());

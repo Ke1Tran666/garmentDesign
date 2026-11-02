@@ -13,16 +13,11 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
 
 	List<Service> findAllByOrderByCreatedAtDesc();
 
-	List<Service> findByDeletedAtIsNullAndStatusIgnoreCaseOrderByCreatedAtDesc(
-			String status);
+	List<Service> findByDeletedAtIsNullAndStatusIgnoreCaseOrderByCreatedAtDesc(String status);
 
-	Optional<Service> findByServiceIdAndDeletedAtIsNullAndStatusIgnoreCase(
-			Long serviceId,
-			String status);
+	Optional<Service> findByServiceIdAndDeletedAtIsNullAndStatusIgnoreCase(Long serviceId, String status);
 
 	boolean existsByServiceCodeIgnoreCase(String serviceCode);
 
-	boolean existsByServiceCodeIgnoreCaseAndServiceIdNot(
-			String serviceCode,
-			Long serviceId);
+	boolean existsByServiceCodeIgnoreCaseAndServiceIdNot(String serviceCode, Long serviceId);
 }
