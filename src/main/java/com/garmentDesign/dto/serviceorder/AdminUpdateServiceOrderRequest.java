@@ -10,6 +10,7 @@ public class AdminUpdateServiceOrderRequest {
 	private String customerRequest;
 	private String unitType;
 	private BigDecimal quantity;
+	private BigDecimal meterCount;
 	private BigDecimal unitPrice;
 	private BigDecimal discountAmount;
 	private BigDecimal totalPrice;
@@ -49,6 +50,14 @@ public class AdminUpdateServiceOrderRequest {
 
 	public void setUnitType(String unitType) {
 		this.unitType = unitType;
+	}
+
+	public BigDecimal getMeterCount() {
+		return meterCount;
+	}
+
+	public void setMeterCount(BigDecimal meterCount) {
+		this.meterCount = meterCount;
 	}
 
 	public BigDecimal getQuantity() {

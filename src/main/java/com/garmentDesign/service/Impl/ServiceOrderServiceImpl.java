@@ -77,8 +77,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 	@Override
 	@Transactional
 	public ServiceOrder updateByAdmin(Long orderId, String adminUsername, AdminUpdateServiceOrderRequest request) {
-		ServiceOrder order = repository.findById(orderId)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng #" + orderId));
+		ServiceOrder order = repository.findById(orderId).orElseThrow(
+				() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng #" + orderId));
 
 		if (request.getStatus() != null && !request.getStatus().trim().isBlank()) {
 			String newStatus = request.getStatus().trim().toLowerCase();
@@ -130,6 +130,10 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 		if (adminUsername != null && !adminUsername.isBlank()) {
 			order.setUpdatedBy(adminUsername);
 		}
+		if (request.getMeterCount() != null && request.getMeterCount().compareTo(BigDecimal.ZERO) >= 0) {
+			order.setMeterCount(request.getMeterCount());
+		}
+
 		order.setUpdatedAt(LocalDateTime.now());
 
 		return repository.save(order);
