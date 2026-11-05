@@ -40,6 +40,8 @@ public class ServiceOrder {
 	private BigDecimal totalPrice;
 
 	private BigDecimal quantity;
+	@Column(name = "meter_count", precision = 18, scale = 4)
+	private BigDecimal meterCount;
 	private String status;
 
 	@Column(name = "received_date")
@@ -70,6 +72,14 @@ public class ServiceOrder {
 	@PreUpdate
 	public void preUpdate() {
 		updatedAt = LocalDateTime.now();
+	}
+
+	public BigDecimal getMeterCount() {
+		return meterCount;
+	}
+
+	public void setMeterCount(BigDecimal meterCount) {
+		this.meterCount = meterCount;
 	}
 
 	public Long getServiceOrderId() {
