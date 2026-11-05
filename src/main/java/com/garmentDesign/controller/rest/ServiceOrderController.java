@@ -1,5 +1,7 @@
 package com.garmentDesign.controller.rest;
 
+import com.garmentDesign.dto.serviceorder.AdminUpdateServiceOrderRequest;
+import com.garmentDesign.dto.serviceorder.UserCreateServiceOrderRequest;
 import com.garmentDesign.dto.serviceorder.UserRemoveServiceOrderResponse;
 import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
@@ -9,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
-import com.garmentDesign.dto.serviceorder.UserCreateServiceOrderRequest;
 import java.util.List;
 
 @RestController
@@ -31,6 +32,20 @@ public class ServiceOrderController {
 	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
 	public ServiceOrder getById(@PathVariable Long id) {
 		return service.findById(id);
+	}
+
+	@PatchMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ServiceOrder updateByAdmin(@PathVariable Long id, Principal principal,
+			@RequestBody AdminUpdateServiceOrderRequest request) {
+		return service.updateByAdmin(id, principal != null ? principal.getName() : null, request);
+	}
+
+	@PutMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+	public ServiceOrder replaceByAdmin(@PathVariable Long id, Principal principal,
+			@RequestBody AdminUpdateServiceOrderRequest request) {
+		return service.updateByAdmin(id, principal != null ? principal.getName() : null, request);
 	}
 
 	@GetMapping("/me")

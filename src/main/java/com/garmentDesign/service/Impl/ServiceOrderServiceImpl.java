@@ -1,6 +1,7 @@
 package com.garmentDesign.service.Impl;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.beans.BeanUtils;
@@ -10,6 +11,7 @@ import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.garmentDesign.dto.serviceorder.AdminUpdateServiceOrderRequest;
 import com.garmentDesign.dto.serviceorder.UserRemoveServiceOrderResponse;
 import com.garmentDesign.dto.serviceorder.UserUpdateOrderAddressRequest;
 import com.garmentDesign.dto.serviceorder.UserUpdateServiceOrderRequest;
@@ -70,6 +72,67 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 		ServiceOrder oldData = findById(id);
 		BeanUtils.copyProperties(data, oldData);
 		return repository.save(oldData);
+	}
+
+	@Override
+	@Transactional
+	public ServiceOrder updateByAdmin(Long orderId, String adminUsername, AdminUpdateServiceOrderRequest request) {
+		ServiceOrder order = repository.findById(orderId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng #" + orderId));
+
+		if (request.getStatus() != null && !request.getStatus().trim().isBlank()) {
+			String newStatus = request.getStatus().trim().toLowerCase();
+			order.setStatus(newStatus);
+			if ("completed".equals(newStatus) && order.getCompletedDate() == null) {
+				order.setCompletedDate(LocalDate.now());
+			}
+			if ("active".equals(newStatus) && order.getReceivedDate() == null) {
+				order.setReceivedDate(LocalDate.now());
+			}
+		}
+
+		if (request.getProductName() != null && !request.getProductName().trim().isBlank()) {
+			order.setProductName(request.getProductName().trim());
+		}
+
+		if (request.getCustomerRequest() != null) {
+			order.setCustomerRequest(request.getCustomerRequest().trim());
+		}
+
+		if (request.getUnitType() != null && !request.getUnitType().trim().isBlank()) {
+			order.setUnitType(request.getUnitType().trim());
+		}
+
+		if (request.getQuantity() != null && request.getQuantity().compareTo(BigDecimal.ZERO) > 0) {
+			order.setQuantity(request.getQuantity());
+		}
+
+		if (request.getUnitPrice() != null) {
+			order.setUnitPrice(request.getUnitPrice());
+		}
+
+		if (request.getDiscountAmount() != null) {
+			order.setDiscountAmount(request.getDiscountAmount());
+		}
+
+		if (request.getTotalPrice() != null) {
+			order.setTotalPrice(request.getTotalPrice());
+		}
+
+		if (request.getReceivedDate() != null) {
+			order.setReceivedDate(request.getReceivedDate());
+		}
+
+		if (request.getCompletedDate() != null) {
+			order.setCompletedDate(request.getCompletedDate());
+		}
+
+		if (adminUsername != null && !adminUsername.isBlank()) {
+			order.setUpdatedBy(adminUsername);
+		}
+		order.setUpdatedAt(LocalDateTime.now());
+
+		return repository.save(order);
 	}
 
 	@Override
