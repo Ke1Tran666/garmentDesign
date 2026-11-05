@@ -169,10 +169,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
 		BigDecimal unitPrice = currentOrder.getUnitPrice() == null ? BigDecimal.ZERO : currentOrder.getUnitPrice();
 
-		BigDecimal discountAmount = currentOrder.getDiscountAmount() == null ? BigDecimal.ZERO
-				: currentOrder.getDiscountAmount();
-
-		BigDecimal totalPrice = unitPrice.multiply(quantity).subtract(discountAmount).max(BigDecimal.ZERO);
+		BigDecimal totalPrice = unitPrice.multiply(quantity).max(BigDecimal.ZERO);
 
 		int affectedRows = repository.updateEditableFieldsByUser(orderId, idUser, productName,
 				request.getCustomerRequest(), unitType, quantity, totalPrice);
@@ -324,7 +321,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
 		BigDecimal discountAmount = BigDecimal.ZERO;
 
-		BigDecimal totalPrice = unitPrice.multiply(request.getQuantity()).subtract(discountAmount).max(BigDecimal.ZERO);
+		BigDecimal totalPrice = unitPrice.multiply(request.getQuantity()).max(BigDecimal.ZERO);
 
 		ServiceOrder order = new ServiceOrder();
 
