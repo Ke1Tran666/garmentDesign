@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -464,8 +465,63 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<User> findAll() {
-		return repository.findAll();
+		List<User> users = repository.findAll();
+		if (users.isEmpty()) {
+			return users;
+		}
+
+		Map<String, List<UserAuthProvider>> providersByUserId = new HashMap<>();
+		for (UserAuthProvider provider : authProviderRepository.findAll()) {
+			if (provider.getUser() != null && provider.getUser().getIdUser() != null) {
+				providersByUserId.computeIfAbsent(provider.getUser().getIdUser(), key -> new ArrayList<>())
+						.add(provider);
+			}
+		}
+
+		for (User user : users) {
+			List<UserAuthProvider> userProviders = providersByUserId.getOrDefault(user.getIdUser(), List.of());
+			boolean userDeleted = user.getDeletedAt() != null || "delete".equalsIgnoreCase(user.getStatus());
+
+			List<UserAuthProvider> candidateProviders = userProviders.stream().filter(p -> p.getDeletedAt() == null)
+					.toList();
+
+			if (candidateProviders.isEmpty() && userDeleted) {
+				candidateProviders = userProviders;
+			}
+
+			String resolvedEmail = null;
+			int bestEmailPriority = -1;
+			String resolvedPhone = null;
+			int bestPhonePriority = -1;
+
+			for (UserAuthProvider provider : candidateProviders) {
+				String pType = provider.getProvider() == null ? ""
+						: provider.getProvider().trim().toLowerCase(Locale.ROOT);
+
+				if (provider.getEmail() != null && !provider.getEmail().isBlank()) {
+					int priority = "local".equals(pType) ? 2 : ("google".equals(pType) ? 1 : 0);
+					if (priority > bestEmailPriority) {
+						resolvedEmail = provider.getEmail();
+						bestEmailPriority = priority;
+					}
+				}
+
+				if (provider.getPhone() != null && !provider.getPhone().isBlank()) {
+					int priority = "phone".equals(pType) ? 1 : 0;
+					if (priority > bestPhonePriority) {
+						resolvedPhone = provider.getPhone();
+						bestPhonePriority = priority;
+					}
+				}
+			}
+
+			user.setEmail(resolvedEmail);
+			user.setPhone(resolvedPhone);
+		}
+
+		return users;
 	}
 
 	@Override
@@ -623,6 +679,9 @@ public class UserServiceImpl implements UserService {
 		if (normalizedPhone != null) {
 			updateProfilePhone(user, normalizedPhone);
 		}
+
+		user.setEmail(email);
+		user.setPhone(normalizedPhone);
 
 		return user;
 	}
