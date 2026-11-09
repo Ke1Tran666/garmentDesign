@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 @Entity
 @Table(name = "Users")
@@ -17,6 +18,12 @@ public class User {
 	private String userCode;
 	@Column(name = "full_name", length = 100)
 	private String fullName;
+	@Transient
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private String email;
+	@Transient
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private String phone;
 	@Column(name = "avatar")
 	private String avatar;
 	@Column(name = "gender", length = 10)
@@ -82,6 +89,22 @@ public class User {
 
 	public void setFullName(String fullName) {
 		this.fullName = fullName;
+	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
+	public String getPhone() {
+		return phone;
+	}
+
+	public void setPhone(String phone) {
+		this.phone = phone;
 	}
 
 	public String getAvatar() {
