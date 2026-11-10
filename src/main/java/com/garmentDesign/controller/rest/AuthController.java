@@ -1,7 +1,10 @@
 package com.garmentDesign.controller.rest;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -65,12 +68,20 @@ public class AuthController {
 			throw new RuntimeException("Tài khoản chưa được phân quyền");
 		}
 
-		String normalizedRole = user.role().trim().toUpperCase();
+		String normalizedRole = user.role().trim().toUpperCase().replaceAll("\\s+", "_");
 
-		GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + normalizedRole);
+		Set<GrantedAuthority> authorities = new LinkedHashSet<>();
+		authorities.add(new SimpleGrantedAuthority("ROLE_" + normalizedRole));
+		if (Long.valueOf(1L).equals(user.roleId())) {
+			authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+		} else if (Long.valueOf(2L).equals(user.roleId())) {
+			authorities.add(new SimpleGrantedAuthority("ROLE_STAFF"));
+		} else if (Long.valueOf(3L).equals(user.roleId())) {
+			authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+		}
 
 		Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(user.idUser(), null,
-				List.of(authority));
+				new ArrayList<>(authorities));
 
 		HttpSession existingSession = request.getSession(false);
 

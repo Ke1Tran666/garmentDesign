@@ -1,10 +1,13 @@
 package com.garmentDesign.controller.rest;
 
+import com.garmentDesign.dto.role.RoleUpsertRequest;
+import com.garmentDesign.entity.Permission;
 import com.garmentDesign.entity.Role;
 import com.garmentDesign.service.RoleService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/roles")
@@ -16,28 +19,40 @@ public class RoleController {
 	}
 
 	@GetMapping
+	@PreAuthorize("hasRole('ADMIN')")
 	public List<Role> getAll() {
 		return service.findAll();
 	}
 
+	@GetMapping("/permissions")
+	@PreAuthorize("hasRole('ADMIN')")
+	public List<Permission> getAllPermissions() {
+		return service.findAllPermissions();
+	}
+
 	@GetMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public Role getById(@PathVariable Long id) {
 		return service.findById(id);
 	}
 
 	@PostMapping
-	public Role create(@RequestBody Role data) {
-		return service.save(data);
+	@PreAuthorize("hasRole('ADMIN')")
+	public Role create(@RequestBody RoleUpsertRequest request) {
+		return service.create(request);
 	}
 
 	@PutMapping("/{id}")
-	public Role update(@PathVariable Long id, @RequestBody Role data) {
-		return service.update(id, data);
+	@PreAuthorize("hasRole('ADMIN')")
+	public Role update(@PathVariable Long id, @RequestBody RoleUpsertRequest request) {
+		return service.update(id, request);
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<Void> delete(@PathVariable Long id) {
-		service.delete(id);
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<Void> delete(@PathVariable Long id,
+			@RequestParam(required = false) Long replacementRoleId) {
+		service.delete(id, replacementRoleId);
 		return ResponseEntity.noContent().build();
 	}
 }

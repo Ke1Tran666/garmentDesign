@@ -164,7 +164,7 @@ public class AuthServiceImpl implements AuthService {
 			throw new RuntimeException("Tài khoản chưa được phân quyền");
 		}
 
-		return new AuthenticatedUser(user.getIdUser(), user.getRole().getNameRole());
+		return new AuthenticatedUser(user.getIdUser(), user.getRole().getNameRole(), user.getRole().getIdRole());
 	}
 
 	private User createPendingGoogleUser(String fullName) {
