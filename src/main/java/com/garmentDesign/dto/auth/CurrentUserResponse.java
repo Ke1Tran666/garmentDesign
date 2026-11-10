@@ -5,11 +5,12 @@ import java.time.LocalDate;
 import com.garmentDesign.entity.User;
 
 public record CurrentUserResponse(String idUser, String userCode, String fullName, String avatar, String gender,
-		LocalDate birthday, String status, String role) {
+		LocalDate birthday, String status, String role, Long roleId) {
 	public static CurrentUserResponse from(User user) {
 		String roleName = user.getRole() == null ? null : user.getRole().getNameRole();
+		Long roleId = user.getRole() == null ? null : user.getRole().getIdRole();
 
 		return new CurrentUserResponse(user.getIdUser(), user.getUserCode(), user.getFullName(), user.getAvatar(),
-				user.getGender(), user.getBirthday(), user.getStatus(), roleName);
+				user.getGender(), user.getBirthday(), user.getStatus(), roleName, roleId);
 	}
 }

@@ -1113,19 +1113,37 @@ public class UserServiceImpl implements UserService {
 		return result;
 	}
 
-	private String normalizeRoleName(User user) {
+	private String normalizeRoleName(Role role) {
 
-		if (user == null || user.getRole() == null) {
+		if (role == null || role.getNameRole() == null) {
 			return "";
 		}
 
-		String roleName = user.getRole().getNameRole();
+		return role.getNameRole().trim().toUpperCase(Locale.ROOT);
+	}
 
-		if (roleName == null) {
-			return "";
+	private boolean isAdminRole(Role role) {
+		if (role == null) {
+			return false;
 		}
 
-		return roleName.trim().toUpperCase(Locale.ROOT);
+		return Long.valueOf(1L).equals(role.getIdRole()) || "ADMIN".equals(normalizeRoleName(role));
+	}
+
+	private boolean isStaffRole(Role role) {
+		if (role == null) {
+			return false;
+		}
+
+		return Long.valueOf(2L).equals(role.getIdRole()) || "STAFF".equals(normalizeRoleName(role));
+	}
+
+	private boolean isDefaultUserRole(Role role) {
+		if (role == null) {
+			return false;
+		}
+
+		return Long.valueOf(3L).equals(role.getIdRole()) || "USER".equals(normalizeRoleName(role));
 	}
 
 	@Override
@@ -1146,13 +1164,10 @@ public class UserServiceImpl implements UserService {
 		User target = repository.findByIdUserAndDeletedAtIsNull(targetId)
 				.orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
-		String actorRole = normalizeRoleName(actor);
-		String targetRole = normalizeRoleName(target);
-
 		/*
 		 * Admin được chỉnh sửa tất cả người dùng.
 		 */
-		if ("ADMIN".equals(actorRole)) {
+		if (isAdminRole(actor.getRole())) {
 			return;
 		}
 
@@ -1160,7 +1175,8 @@ public class UserServiceImpl implements UserService {
 		 * Staff chỉ được chỉnh: - chính tài khoản của mình; - tài khoản có vai trò
 		 * USER.
 		 */
-		boolean staffCanEdit = "STAFF".equals(actorRole) && (actorId.equals(targetId) || "USER".equals(targetRole));
+		boolean staffCanEdit = isStaffRole(actor.getRole())
+				&& (actorId.equals(targetId) || isDefaultUserRole(target.getRole()));
 
 		if (!staffCanEdit) {
 			throw new AccessDeniedException("Bạn không có quyền chỉnh sửa người dùng này");
@@ -1185,10 +1201,7 @@ public class UserServiceImpl implements UserService {
 		Role nextRole = roleRepository.findById(roleId)
 				.orElseThrow(() -> new RuntimeException("Vai trò không tồn tại"));
 
-		String currentRoleName = normalizeRoleName(user);
-
-		String nextRoleName = nextRole.getNameRole() == null ? ""
-				: nextRole.getNameRole().trim().toUpperCase(Locale.ROOT);
+		String nextRoleName = normalizeRoleName(nextRole);
 
 		if (nextRoleName.isBlank()) {
 			throw new RuntimeException("Vai trò không hợp lệ");
@@ -1204,8 +1217,8 @@ public class UserServiceImpl implements UserService {
 		/*
 		 * Không cho hạ quyền Admin cuối cùng của hệ thống.
 		 */
-		if ("ADMIN".equals(currentRoleName) && !"ADMIN".equals(nextRoleName)) {
-			long adminCount = repository.countByRole_NameRoleIgnoreCaseAndDeletedAtIsNull("ADMIN");
+		if (isAdminRole(user.getRole()) && !isAdminRole(nextRole)) {
+			long adminCount = repository.countActiveAdmins();
 
 			if (adminCount <= 1) {
 				throw new RuntimeException("Không thể thay đổi vai trò của quản trị viên cuối cùng");
